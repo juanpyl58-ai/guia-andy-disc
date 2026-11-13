@@ -436,13 +436,33 @@ function hookDict(d){
     if(r.state==='idle'&&S.auto){S.auto=false;var q=document.getElementById(S.mt.id);if(q&&q.value.trim()&&S.mt.cb)S.mt.cb(q.value)}
   });
 }
+/* Dictado con la voz del navegador (reemplaza claude.use('dictation') en la version alojada).
+   Mismo contrato que espera hookDict: onPartial/onFinal/onState + start()/stop() que devuelven Promise. */
+function makeBrowserDict(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR)return null;
+  var rec;try{rec=new SR()}catch(e){return null}
+  rec.lang='es-AR';rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
+  var pcb=null,fcb=null,scb=null;
+  rec.onresult=function(e){var interim='',fin='';for(var i=e.resultIndex;i<e.results.length;i++){var r=e.results[i];if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript}if(interim&&pcb)pcb({text:interim});if(fin&&fcb)fcb({text:fin})};
+  rec.onstart=function(){if(scb)scb({state:'listening'})};
+  rec.onend=function(){if(scb)scb({state:'idle'})};
+  rec.onerror=function(){};
+  return {onPartial:function(c){pcb=c},onFinal:function(c){fcb=c},onState:function(c){scb=c},
+    start:function(){try{rec.start();return Promise.resolve()}catch(e){try{rec.stop()}catch(_){}return Promise.reject(e)}},
+    stop:function(){try{rec.stop()}catch(e){}return Promise.resolve()}};
+}
+function ensureBrowserDict(){if(CAP.d)return;var d=makeBrowserDict();if(d){CAP.d=d;hookDict(d);setMic()}}
 function initCaps(){
   try{
-    if(!(window.claude&&claude.use))return;
-    claude.use('sample').then(function(x){CAP.s=x||null}).catch(function(){});
-    claude.use('tts').then(function(x){CAP.t=x||null}).catch(function(){});
-    claude.use('dictation').then(function(x){CAP.d=x||null;if(x){hookDict(x);setMic()}}).catch(function(){});
+    if(window.claude&&claude.use){
+      claude.use('sample').then(function(x){CAP.s=x||null}).catch(function(){});
+      claude.use('tts').then(function(x){CAP.t=x||null}).catch(function(){});
+      claude.use('dictation').then(function(x){if(x){CAP.d=x;hookDict(x);setMic()}else ensureBrowserDict()}).catch(function(){ensureBrowserDict()});
+      return;
+    }
   }catch(e){}
+  ensureBrowserDict();
 }
 var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangre|pierde|perdio|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota/;
 var STOPW='que cual como donde cuando para con por una uno los las del esta este eso esa estoy tengo hago debo puedo hay mas muy pero sobre algo cosa paso pasos'.split(' ');
