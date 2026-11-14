@@ -527,12 +527,24 @@ var CYES=/\b(si+|sip|dale|listo|ya esta|ya|seguimos|segui|segu[ií]|continuar|co
 function isWait(n){return /\b(todavia|todav[ií]a|espera|esper[aá]|esperame|esper[aá]me|pera|aguanta|aguant[aá]|aun no|a[uú]n no|ahora no|pausa|para un|dame un|un segundo|un momento|un minuto)\b/.test(n)||/^(no|nono|no no)$/.test(n.trim())}
 function isAdv(n){
   n=n.trim();if(isWait(n))return false;
-  if(/^(si+|s[ií]|sip|sii+|si si|sisi|ya|ya esta|dale|ok|okey|okay|oka|bueno|aja|ajá|obvio|exacto|correcto|listo|joya|genial|vamos|vamo|de una)$/.test(n))return true;
-  return /\b(dale|de una|de once|sigamos|sigo|sig[ao]|segu[ií]|seguime|seguimos|seguir|contin|avanz|pas(a|á|amos|emos)|proxim|el que sigue|lo que sigue|adelante|listo|ya esta|hecho|obvio|tal cual|joya|b[aá]rbaro|genial|vamos|vamo|arranc|metele|ah[ií] va|as[ií] es|perfecto)/.test(n);
+  if(/^(si+|s[ií]|sip|sii+|si si|sisi|ya|ya esta|ya esta hecho|ya lo hice|lo hice|ya hice|ya termine|termine|dale|ok|okey|okay|oka|bueno|aja|ajá|obvio|exacto|correcto|listo|joya|genial|vamos|vamo|de una)$/.test(n))return true;
+  return /\b(dale|de una|de once|sigamos|sigo|sig[ao]|segu[ií]|seguime|seguimos|seguir|contin|avanz|pas(a|á|amos|emos)|proxim|el que sigue|lo que sigue|adelante|listo|ya esta|ya lo hice|ya la hice|lo hice|ya hice|ya termine|termine|ya esta hecho|hecho|obvio|tal cual|joya|b[aá]rbaro|genial|vamos|vamo|arranc|metele|ah[ií] va|as[ií] es|perfecto)/.test(n);
 }
 function isBack(n){return /\b(atras|atr[aá]s|para atras|para atr[aá]s|volver|volv[eé]|volvamos|volvé|anterior|el anterior|el de antes|retroced|retrocede|retrocedé|uno atras|uno atr[aá]s|paso anterior|un paso atras)\b/.test(n)}
 function isRepeat(n){return /\b(repet|repit|de nuevo|devuelta|de vuelta|otra vez|no entiendo|no entend[ií]|no escuche|no escuch[eé]|mas despacio|m[aá]s despacio|no se escucho|no se entiende)\b/.test(n)}
 function isStop(n){return /\b(terminar|salir|parar|basta|apaga|apagar|manos libres|detener|silencio|callate|callat[eé]|chau|pará todo)\b/.test(n)}
+/* saltar por voz a una parte: "llevame al drenaje", "ir a la infusion", "al paso 17" */
+function stepByName(n){
+  if(/lavado de manos|lavar(me| las| me las| mis)? manos|como me lavo|t[eé]cnica de lavado/.test(n))return -2;
+  var map=[['desconex|desconect',23],['drenaj|drenar|\\bdrena\\b|sacar el liquido|vaciar',16],['pesar|pes[oa] la bolsa|registrar|anotar',17],['lavar el sistema|lavar sistema|\\blave\\b|\\blavado del? sistema',18],['infusion|infund|meter el liquido|entrar el liquido',19],['cuatro puntos',20],['cerrar la pinza|pinza del extensor|pinza',21],['tercera desinfec|desinfec',22],['descart|inodoro|tirar el liquido|basura',24],['conex|conectar|conecto|enganchar',15],['segunda desinfec',14],['cateter en el organizador|poner el cateter',13],['despegar|gu[ií]as',12],['desinfectar las manos|alcohol gel|segunda desinfec',11],['poner el tapon|\\btapon\\b|tap[oó]n',10],['organizador en el soporte|poner el organizador|organizador',9],['colgar|hermeticidad|bolsa colgada',8],['taper',6],['ver la bolsa|mirar la bolsa|abrir la bolsa',5],['limpiar la mesa|la mesa|alcohol 70',4],['barbijo',3],['sacar el cateter|sacar cateter',2],['cerrar puertas|ventanas',1],['lavado de manos social|lavarse las manos|primer lavado',0]];
+  for(var i=0;i<map.length;i++){if(new RegExp(map[i][0]).test(n))return map[i][1]}
+  var m=n.match(/paso (\d{1,2})/);if(m&&+m[1]>=1&&+m[1]<=STEPS.length)return +m[1]-1;
+  return -1;
+}
+function jumpIntent(n){
+  if(/\b(ir a|ir al|anda a|and[aá] a|andate a|llevame|llev[aá]me|vamos a|vamo a|quiero|lleva a|volver a|volve a|salta a|salt[aá] a|pasa a|pas[aá] a|mostrame|most[ra]me|anda al|al paso|a los pasos|el paso|voy a|pasemos a|ir para)\b/.test(n))return stepByName(n);
+  return -1;
+}
 function convoStart(){
   if(!CAP.d){say('El modo manos libres necesita micrófono. Use los botones grandes.');return}
   S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
@@ -540,8 +552,10 @@ function convoStart(){
 }
 function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
+var WASHGAP=3000;
 function convoStep(){
   if(!S.convo)return;S.convoAskedAt=0;
+  if(S.flow==='wash'){convoWashRead();return}
   if(S.flow==='main'&&S.i===7&&!S.washKnown){
     S.washAsk=true;
     sayThen(stepText()+' ¿Querés que te recuerde cómo se lavan las manos? Diga sí para verlo, o no para seguir.',function(){if(S.convo)convoListen()});
@@ -549,10 +563,26 @@ function convoStep(){
   }
   sayThen(stepText(),function(){if(S.convo)convoListen()});
 }
+/* lavado fluido en voz: lee solo la indicación y avanza solo tras una pausa; escucha "pausa" para frenar */
+function convoWashRead(){
+  if(!S.convo||S.flow!=='wash')return;S.convoAskedAt=0;
+  sayThen((S.i===0?'Lavado de manos. ':'')+WASH[S.i],function(){
+    if(!S.convo||S.flow!=='wash')return;
+    S.heard=false;
+    if(!S.washPaused){clearTimeout(S.washTimer);S.washTimer=setTimeout(function(){
+      if(!S.convo||S.flow!=='wash'||S.washPaused)return;
+      try{CAP.d&&CAP.d.stop()}catch(e){}convoWashNext();
+    },WASHGAP);}
+    convoListen();
+  });
+}
 function convoListen(){if(!S.convo||!CAP.d)return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
-  if(!S.convo)return;S.heard=true;var n=norm(text);
+  if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
+  var jj=jumpIntent(n);
+  if(jj===-2){S.washAsk=false;washStartAuto(S.flow==='main'?S.i:S.back);return}
+  if(jj>=0){S.washAsk=false;S.flow='main';S.i=jj;sv('i',jj);S.saved=jj;render();window.scrollTo(0,0);convoStep();return}
   if(S.washAsk){
     S.washAsk=false;
     if(/\b(no|ya se|ya s[eé]|lo se|lo s[eé]|se lavar|siguiente|sigamos|segu|continu|salt|omit)\b/.test(n)){S.washKnown=true;sv('washknown','1');convoNext();return}
@@ -588,7 +618,7 @@ function convoAnswer(q){
 }
 function convoOnRecEnd(){
   if(!S.convo||S.heard)return;
-  if(S.flow==='wash'){if(S.washPaused){convoListen()}else{convoWashNext()}return}
+  if(S.flow==='wash'){convoListen();return}
   var now=Date.now();
   if(now-S.convoAskedAt>11000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
   else convoListen();
@@ -596,9 +626,9 @@ function convoOnRecEnd(){
 /* ---------- lavado de manos fluido (sin voz: por tiempo) ---------- */
 function washPlay(){
   if(S.flow!=='wash'||S.washPaused||S.convo)return;
-  sayThen('Paso '+(S.i+1)+' de '+WASH.length+'. '+WASH[S.i],function(){
+  sayThen((S.i===0?'Lavado de manos. ':'')+WASH[S.i],function(){
     if(S.flow!=='wash'||S.washPaused||S.convo)return;
-    clearTimeout(S.washTimer);S.washTimer=setTimeout(washNextAuto,1100);
+    clearTimeout(S.washTimer);S.washTimer=setTimeout(washNextAuto,WASHGAP);
   });
 }
 function washNextAuto(){
@@ -685,6 +715,9 @@ function askQ(q){
   q=(q||'').trim();if(!q)return;var n=norm(q);
   if(isAdv(n)){S.ask=false;render();var nb=document.querySelector('[data-act=next]');if(nb)nb.click();return}
   if(isBack(n)){S.ask=false;render();var pb=document.querySelector('[data-act=prev]');if(pb)pb.click();return}
+  var jj=jumpIntent(n);
+  if(jj===-2){S.ask=false;washStartAuto(S.view==='step'&&S.flow==='main'?S.i:0);return}
+  if(jj>=0){S.ask=false;go(jj,'main');return}
   if(/^(ayuda)$/.test(n)){S.ask=false;S.help=true;render();return}
   var loc=localAnswer(q,n);
   function show(r){S.ans={q:q,t:r.t,n:r.n};paintAsk();say(r.t)}
@@ -931,7 +964,7 @@ app.addEventListener('click',function(e){
       break;
     case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];logSave();S.logConfirm=false;render()}break;
     case 'resume':go(S.saved,'main');break;
-    case 'convostart':S.convo=true;if(S.view!=='step'){go(S.saved||0,'main')}convoStart();break;
+    case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
     case 'next':
       if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i>=WASH.length-1){washEnd()}else{go(S.i+1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
@@ -943,7 +976,7 @@ app.addEventListener('click',function(e){
       if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i===0)washEnd();else{go(S.i-1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
       else if(S.i>0)go(S.i-1,'main'); else{stopCount();S.view='home';render()}
       break;
-    case 'speak':case 'speak2':if(S.convo){convoStep();}else say(stepText());break;
+    case 'speak':case 'speak2':if(S.convo){convoStep();}else say(S.flow==='wash'?WASH[S.i]:stepText());break;
     case 'help':if(S.convo)convoStop();S.help=true;render();break;
     case 'closehelp':S.help=false;render();break;
     case 'index':if(S.convo)convoStop();S.help=false;S.back=1;stopCount();S.view='index';render();window.scrollTo(0,0);break;
