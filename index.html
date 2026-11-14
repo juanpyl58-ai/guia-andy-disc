@@ -118,6 +118,13 @@ textarea{font:inherit;font-size:.7em;width:100%;min-height:8em;padding:12px;bord
 .pn-one{left:10px;top:6px}.pn-lave{right:10px;top:6px}.pn-inf{right:10px;bottom:4px}.pn-four{left:10px;top:42%}
 .legend{display:grid;gap:6px;margin:10px 0 0;padding:0;list-style:none;font-size:.8em}
 .legend li{display:flex;gap:10px;align-items:center}.legend svg{width:30px;height:30px;flex:none}
+.homewrap{padding-block:16px 40px;display:flex;flex-direction:column;min-height:70vh}
+.bigmic{width:100%;max-width:520px;margin:0 auto;aspect-ratio:1/1;max-height:62vh;border-radius:36px;border:6px solid var(--accent);background:var(--accent);color:var(--accent-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;box-shadow:0 14px 36px rgba(11,79,156,.35);cursor:pointer;padding:16px}
+.bigmic .micring{width:46%;max-width:220px;aspect-ratio:1/1;border-radius:50%;background:var(--accent-ink);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+.bigmic .micring svg{width:56%;height:56%}
+.bigmic b{font-size:1.5em;font-weight:700;letter-spacing:.03em;line-height:1}
+.bigmic .micsub{font-size:.85em;font-weight:700;opacity:.92;text-align:center;line-height:1.1}
+@media (prefers-reduced-motion:no-preference){.bigmic{animation:breathe 2.6s ease-in-out infinite}@keyframes breathe{50%{transform:scale(1.025);box-shadow:0 18px 44px rgba(11,79,156,.45)}}}
 .askrow{display:grid;gap:10px}
 input[type=text]{font:inherit;padding:16px;border:3px solid var(--line);border-radius:14px;background:var(--bg);color:var(--fg);width:100%}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -226,15 +233,15 @@ function browserSay(t){
       if(!part)return;
       var u=new SpeechSynthesisUtterance(part);
       u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;
-      u.rate=.9;u.pitch=1;
+      u.rate=1.02;u.pitch=1.02;
       speechSynthesis.speak(u);
     });
   }catch(e){}
 }
 function say(t){
-  t=speakable(t);
+  t=speakable(t);stopSay();
   if(CAP.t){
-    try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:.92,language:'es'}).catch(function(e){if(e&&e.code!=='viewer_stopped')browserSay(t)});return}catch(e){}
+    try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).catch(function(e){if(e&&e.code!=='viewer_stopped')browserSay(t)});return}catch(e){}
   }
   browserSay(t);
 }
@@ -253,20 +260,20 @@ function topbar(label,right,fracs){
    +fracs.map(function(f){return '<div class="seg"><i style="width:'+Math.round(f*100)+'%"></i></div>'}).join('')+'</header>';
 }
 function vHome(){
-  var cont=S.saved>0&&S.saved<STEPS.length?'<button class="btn primary" data-act="resume">Continuar en el paso '+(S.saved+1)+'</button>':'';
-  return '<main style="padding-block:28px 40px"><div class="stack">'
-   +'<h1 class="title-big">'+(S.nick?'Hola, '+esc(S.nick):'Conexión paso a paso')+'</h1>'
-   +'<p class="sub">Sistema Andy Disc de bolsas, para diálisis peritoneal. Una cosa a la vez, a su ritmo.</p>'
-   +cont
-   +'<button class="btn primary" data-act="start">'+(cont?'Empezar desde el principio':'Empezar')+IC.next+'</button>'
-   +'<button class="btn primary" data-act="convostart">'+IC.mic+'Modo manos libres</button>'
-   +'<button class="btn" data-act="index">'+IC.list+'Ver todos los pasos</button>'
-   +'<button class="btn" data-act="ask">'+IC.mic+'Hacer una pregunta</button>'
-   +'<button class="btn" data-act="log">Mi registro de cambios</button>'
-   +'<button class="btn" data-act="washonly">Cómo lavarse las manos</button>'
-   +'<button class="btn soft" data-act="help">Tamaño de letra, voz y teléfono</button>'
-   +'<button class="btn soft" data-act="rename">Cambiar cómo me llaman</button>'
-   +'<p class="note">Esta guía reproduce las hojas de instrucciones que le dieron en Nefra Medical Care. Acompaña el entrenamiento de su enfermera o enfermero, no lo reemplaza.</p>'
+  var cont=S.saved>0&&S.saved<STEPS.length;
+  return '<main class="homewrap">'
+   +'<button class="bigmic" data-act="convostart" aria-label="Tocar para empezar con la voz">'
+     +'<span class="micring">'+IC.micbig+'</span>'
+     +'<b>TOCAR AQUÍ</b><span class="micsub">para empezar con la voz</span></button>'
+   +'<div class="stack" style="margin-top:14px">'
+   +(cont?'<button class="btn" data-act="resume">Seguir en el paso '+(S.saved+1)+'</button>':'')
+   +'<button class="btn" data-act="start">Ver la guía con botones</button>'
+   +'<button class="btn soft" data-act="help">Letra más grande y voz</button>'
+   +'<button class="btn soft" data-act="index">Ver todos los pasos</button>'
+   +'<button class="btn soft" data-act="log">Mi registro</button>'
+   +'<button class="btn soft" data-act="washonly">Lavado de manos</button>'
+   +'<button class="btn soft" data-act="rename">Cambiar mi nombre</button>'
+   +'<p class="note">Guía del sistema Andy Disc (Nefra Medical Care). Acompaña el entrenamiento de su enfermera o enfermero, no lo reemplaza.</p>'
    +'</div></main>';
 }
 function vStep(){
@@ -370,6 +377,7 @@ var ART={
 };
 var STEPART=['wash','door','cath','mask','table','bag','taper','wash','hang','organizer','cap','gel','guides','organizer','gel','','drain','scale','disc','disc','disc','clamp','gel','pin','toilet'];
 function artBox(k){var a=ART[k];if(!a)return '';return '<div class="artbox"><svg class="art" viewBox="0 0 240 150" role="img" aria-label="Dibujo: '+a[0]+'">'+a[1]+'</svg></div>'}
+IC.micbig='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg>';
 IC.mic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
 
 
@@ -436,7 +444,7 @@ S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
 S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
 S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
 S.nick=ld('nick','');S.nm='';S.nerr='';
-if(!S.nick)S.view='name';
+/* arranca en el inicio con el micrófono grande; el nombre es opcional (menú) */
 try{S.log=JSON.parse(ld('log','[]'))||[]}catch(e){S.log=[]}
 
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -487,8 +495,9 @@ function hookDict(d){
 }
 /* ---------- modo conversacion (manos libres) ---------- */
 function sayThen(t,cb){
-  t=speakable(t);var done=false;function fin(){if(done)return;done=true;try{cb&&cb()}catch(e){}}
-  if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:.92,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
+  t=speakable(t);try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
+  var done=false;function fin(){if(done)return;done=true;try{cb&&cb()}catch(e){}}
+  if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
 }
 function browserSayThen(t,cb){
@@ -499,13 +508,22 @@ function browserSayThen(t,cb){
     var last=parts.length-1,called=false;
     var tm=setTimeout(function(){if(!called){called=true;cb&&cb()}},Math.max(2500,t.length*75)+1500);
     parts.forEach(function(part,idx){
-      var u=new SpeechSynthesisUtterance(part);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=.9;
+      var u=new SpeechSynthesisUtterance(part);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=1.04;u.pitch=1.02;
       if(idx===last)u.onend=function(){if(!called){called=true;clearTimeout(tm);cb&&cb()}};
       speechSynthesis.speak(u);
     });
   }catch(e){cb&&cb()}
 }
 var CYES=/\b(si+|sip|dale|listo|ya esta|ya|seguimos|segui|segu[ií]|continuar|continua|continu[eé]|siguiente|proximo|adelante|okey|ok|correcto|hecho|perfecto|bueno)\b/;
+function isWait(n){return /\b(todavia|todav[ií]a|espera|esper[aá]|esperame|esper[aá]me|pera|aguanta|aguant[aá]|aun no|a[uú]n no|ahora no|pausa|para un|dame un|un segundo|un momento|un minuto)\b/.test(n)||/^(no|nono|no no)$/.test(n.trim())}
+function isAdv(n){
+  n=n.trim();if(isWait(n))return false;
+  if(/^(si+|s[ií]|sip|sii+|si si|sisi|ya|ya esta|dale|ok|okey|okay|oka|bueno|aja|ajá|obvio|exacto|correcto|listo|joya|genial|vamos|vamo|de una)$/.test(n))return true;
+  return /\b(dale|de una|de once|sigamos|sigo|sig[ao]|segu[ií]|seguime|seguimos|seguir|contin|avanz|pas(a|á|amos|emos)|proxim|el que sigue|lo que sigue|adelante|listo|ya esta|hecho|obvio|tal cual|joya|b[aá]rbaro|genial|vamos|vamo|arranc|metele|ah[ií] va|as[ií] es|perfecto)/.test(n);
+}
+function isBack(n){return /\b(atras|atr[aá]s|para atras|para atr[aá]s|volver|volv[eé]|volvamos|volvé|anterior|el anterior|el de antes|retroced|retrocede|retrocedé|uno atras|uno atr[aá]s|paso anterior|un paso atras)\b/.test(n)}
+function isRepeat(n){return /\b(repet|repit|de nuevo|devuelta|de vuelta|otra vez|no entiendo|no entend[ií]|no escuche|no escuch[eé]|mas despacio|m[aá]s despacio|no se escucho|no se entiende)\b/.test(n)}
+function isStop(n){return /\b(terminar|salir|parar|basta|apaga|apagar|manos libres|detener|silencio|callate|callat[eé]|chau|pará todo)\b/.test(n)}
 function convoStart(){
   if(!CAP.d){say('El modo manos libres necesita micrófono. Use los botones grandes.');return}
   S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
@@ -516,11 +534,11 @@ function convoStep(){if(!S.convo)return;S.convoAskedAt=0;sayThen(stepText(),func
 function convoListen(){if(!S.convo||!CAP.d)return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;var n=norm(text);
-  if(/\b(terminar|salir|parar|basta|apaga|apagar|manos libres|detener|silencio)\b/.test(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
-  if(/\b(atras|anterior|volver)\b/.test(n)){if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
-  if(/\b(repet|de nuevo|otra vez|no entiendo|no escuche|repita)\b/.test(n)){convoStep();return}
-  if(CYES.test(n)){convoNext();return}
-  if(/\b(no|todavia|espere|espera|pera|aun no|aguante|pausa|todav[ií]a)\b/.test(n)){sayThen('Bueno'+nn()+'. Cuando esté listo, diga sí.',function(){if(S.convo)convoListen()});return}
+  if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
+  if(isBack(n)){if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
+  if(isRepeat(n)){convoStep();return}
+  if(isAdv(n)){convoNext();return}
+  if(isWait(n)){sayThen('Bueno'+nn()+'. Avíseme cuando siga.',function(){if(S.convo)convoListen()});return}
   convoAnswer(text);
 }
 function convoNext(){
@@ -598,8 +616,8 @@ function claudeAnswer(q){
 }
 function askQ(q){
   q=(q||'').trim();if(!q)return;var n=norm(q);
-  if(/^(listo|ya esta|ya|siguiente|seguir|continuar|adelante|proximo)$/.test(n)){S.ask=false;render();document.querySelector('[data-act=next]').click();return}
-  if(/^(atras|anterior|volver)$/.test(n)){S.ask=false;render();document.querySelector('[data-act=prev]').click();return}
+  if(isAdv(n)){S.ask=false;render();var nb=document.querySelector('[data-act=next]');if(nb)nb.click();return}
+  if(isBack(n)){S.ask=false;render();var pb=document.querySelector('[data-act=prev]');if(pb)pb.click();return}
   if(/^(ayuda)$/.test(n)){S.ask=false;S.help=true;render();return}
   var loc=localAnswer(q,n);
   function show(r){S.ans={q:q,t:r.t,n:r.n};paintAsk();say(r.t)}
@@ -796,12 +814,14 @@ function render(){
   if(S.view==='step'&&!S.help){var t=document.getElementById('ttl');if(t)t.focus({preventScroll:true})}
   var ph=document.getElementById('phone');
   if(ph)ph.addEventListener('input',function(){S.phone=ph.value;sv('phone',ph.value)});
+  if(S.view==='home'&&!S.ask&&!S.help&&!S._greeted){S._greeted=1;setTimeout(greet,500)}
 }
+function greet(){try{say((S.nick?S.nick+'. ':'Hola. ')+'Toque el botón grande del micrófono para empezar.')}catch(e){}}
 function announce(){live.textContent=stepText()}
 function go(i,flow){
   stopCount();S.i=i;S.flow=flow||S.flow;S.view='step';S.help=false;S.ask=false;S.confirm=false;S.dpend=null;S.derr='';if(i!==17)S.nag=false;
   if(S.flow==='main')sv('i',i),S.saved=i;
-  render();window.scrollTo(0,0);announce();if(S.voice)say(stepText());wake();
+  render();window.scrollTo(0,0);announce();if(S.voice&&!S.convo)say(stepText());wake();
 }
 function stopCount(){if(timer){clearInterval(timer);timer=null}}
 var WORDS=['uno','dos','tres','cuatro','cinco'];
@@ -844,7 +864,7 @@ app.addEventListener('click',function(e){
       break;
     case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];logSave();S.logConfirm=false;render()}break;
     case 'resume':go(S.saved,'main');break;
-    case 'convostart':if(S.view!=='step'){go(S.saved||0,'main')}convoStart();break;
+    case 'convostart':S.convo=true;if(S.view!=='step'){go(S.saved||0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
     case 'next':
       if(S.flow==='wash'){ if(S.i>=WASH.length-1){go(S.back,'main')}else go(S.i+1,'wash') }
