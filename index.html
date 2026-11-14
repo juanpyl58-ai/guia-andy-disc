@@ -498,14 +498,20 @@ function hookDict(d){
   d.onFinal(function(r){if(S.convo){convoHeard(r.text);return}S.base=(S.base+' '+r.text).trim();var q=document.getElementById(S.mt.id);if(q)q.value=S.base});
   d.onState(function(r){
     S.listening=(r.state==='listening');setMic();
-    if(S.convo){if(r.state==='idle')setTimeout(convoOnRecEnd,200);return}
+    if(S.convo){if(r.state==='idle')setTimeout(convoOnRecEnd,350);return}
     if(r.state==='idle'&&S.auto){S.auto=false;var q=document.getElementById(S.mt.id);if(q&&q.value.trim()&&S.mt.cb)S.mt.cb(q.value)}
+  });
+  if(d.onError)d.onError(function(err){
+    if(err==='not-allowed'||err==='service-not-allowed'){
+      if(S.convo)convoStop();
+      var n=document.querySelector('.micnote');if(n){n.hidden=false;n.textContent='El teléfono no dio permiso para el micrófono. Permití el micrófono en el navegador, o usá los botones grandes.'}
+    }
   });
 }
 /* ---------- modo conversacion (manos libres) ---------- */
 function sayThen(t,cb){
-  t=speakable(t);try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
-  var done=false;function fin(){if(done)return;done=true;try{cb&&cb()}catch(e){}}
+  t=speakable(t);S.speaking=true;try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
+  var done=false;function fin(){if(done)return;done=true;S.speaking=false;try{cb&&cb()}catch(e){}}
   if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
 }
@@ -514,11 +520,14 @@ function browserSayThen(t,cb){
     if(!('speechSynthesis' in window)){cb&&cb();return}
     speechSynthesis.cancel();if(!VOICE)VOICE=pickVoice();
     var parts=t.split(/(?<=[.!?:])\s+/).filter(Boolean);if(!parts.length){cb&&cb();return}
-    var last=parts.length-1,called=false;
-    var tm=setTimeout(function(){if(!called){called=true;cb&&cb()}},Math.max(2500,t.length*75)+1500);
-    parts.forEach(function(part,idx){
+    var total=parts.length,ended=0,called=false,ri=null;
+    function finish(){if(called)return;called=true;try{clearInterval(ri)}catch(e){}cb&&cb()}
+    ri=setInterval(function(){try{if(speechSynthesis.speaking)speechSynthesis.resume()}catch(e){}},1200);
+    var tm=setTimeout(finish,Math.max(2500,t.length*70)+1200);
+    parts.forEach(function(part){
       var u=new SpeechSynthesisUtterance(part);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=1.04;u.pitch=1.02;
-      if(idx===last)u.onend=function(){if(!called){called=true;clearTimeout(tm);cb&&cb()}};
+      u.onend=function(){ended++;if(ended>=total){clearTimeout(tm);finish()}};
+      u.onerror=function(){ended++;if(ended>=total){clearTimeout(tm);finish()}};
       speechSynthesis.speak(u);
     });
   }catch(e){cb&&cb()}
@@ -552,7 +561,7 @@ function convoStart(){
 }
 function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
-var WASHGAP=3000;
+var WASHGAP=9000;
 function convoStep(){
   if(!S.convo)return;S.convoAskedAt=0;
   if(S.flow==='wash'){convoWashRead();return}
@@ -576,7 +585,7 @@ function convoWashRead(){
     convoListen();
   });
 }
-function convoListen(){if(!S.convo||!CAP.d)return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
+function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
@@ -658,13 +667,14 @@ function makeBrowserDict(){
   if(!SR)return null;
   var rec;try{rec=new SR()}catch(e){return null}
   rec.lang='es-AR';rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
-  var pcb=null,fcb=null,scb=null;
+  var pcb=null,fcb=null,scb=null,ecb=null,on=false;
   rec.onresult=function(e){var interim='',fin='';for(var i=e.resultIndex;i<e.results.length;i++){var r=e.results[i];if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript}if(interim&&pcb)pcb({text:interim});if(fin&&fcb)fcb({text:fin})};
-  rec.onstart=function(){if(scb)scb({state:'listening'})};
-  rec.onend=function(){if(scb)scb({state:'idle'})};
-  rec.onerror=function(){};
-  return {onPartial:function(c){pcb=c},onFinal:function(c){fcb=c},onState:function(c){scb=c},
-    start:function(){try{rec.start();return Promise.resolve()}catch(e){try{rec.stop()}catch(_){}return Promise.reject(e)}},
+  rec.onstart=function(){on=true;if(scb)scb({state:'listening'})};
+  rec.onend=function(){on=false;if(scb)scb({state:'idle'})};
+  rec.onerror=function(e){on=false;if(ecb)ecb(e&&e.error||'error')};
+  return {onPartial:function(c){pcb=c},onFinal:function(c){fcb=c},onState:function(c){scb=c},onError:function(c){ecb=c},
+    isOn:function(){return on},
+    start:function(){if(on)return Promise.resolve();try{rec.start();return Promise.resolve()}catch(e){if(e&&e.name==='InvalidStateError'){on=true;return Promise.resolve()}return Promise.reject(e)}},
     stop:function(){try{rec.stop()}catch(e){}return Promise.resolve()}};
 }
 function ensureBrowserDict(){if(CAP.d)return;var d=makeBrowserDict();if(d){CAP.d=d;hookDict(d);setMic()}}
