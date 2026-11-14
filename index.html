@@ -627,7 +627,7 @@ function convoWashRead(){
     convoListen();
   });
 }
-function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
+function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;setTimeout(function(){if(!S.convo||S.speaking||(CAP.d.isOn&&CAP.d.isOn()))return;try{CAP.d.start().catch(function(){})}catch(e){}},450)}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
