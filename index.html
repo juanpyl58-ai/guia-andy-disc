@@ -232,20 +232,35 @@ function pickVoice(){
     return vs[0];
   }catch(e){return null}
 }
-function browserSay(t){
+/* Lector robusto para el celular: lee en pedacitos cortos, uno tras otro (espera onend o un vigía),
+   con resume() cada 5s (Android pausa la síntesis) y token de aborto. Arregla "se corta / no termina de leer". */
+var TTSID=0,TTSKA=null;
+function ttsKeepAlive(on){try{clearInterval(TTSKA)}catch(e){}TTSKA=null;if(on){TTSKA=setInterval(function(){try{if(speechSynthesis.speaking)speechSynthesis.resume();else{clearInterval(TTSKA);TTSKA=null}}catch(e){}},5000)}}
+function ttsChunks(t){var parts=String(t).split(/(?<=[.!?:,])\s+/),out=[];parts.forEach(function(p){p=p.trim();if(!p)return;while(p.length>140){var cut=p.lastIndexOf(' ',140);if(cut<60)cut=140;out.push(p.slice(0,cut).trim());p=p.slice(cut).trim()}if(p)out.push(p)});return out}
+function speakSeq(t,cb){
   try{
-    if(!('speechSynthesis' in window))return;
-    speechSynthesis.cancel();
+    if(!('speechSynthesis' in window)){cb&&cb();return}
+    var myid=++TTSID;try{speechSynthesis.cancel()}catch(e){}
     if(!VOICE)VOICE=pickVoice();
-    t.split(/(?<=[.!?:])\s+/).forEach(function(part){
-      if(!part)return;
-      var u=new SpeechSynthesisUtterance(part);
-      u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;
-      u.rate=1.02;u.pitch=1.02;
-      speechSynthesis.speak(u);
-    });
-  }catch(e){}
+    var chunks=ttsChunks(t);if(!chunks.length){cb&&cb();return}
+    var done=false,i=0,wd=null;
+    function finish(){if(done)return;done=true;try{clearTimeout(wd)}catch(e){}if(myid===TTSID)ttsKeepAlive(false);cb&&cb()}
+    ttsKeepAlive(true);
+    function next(){
+      if(done)return;try{clearTimeout(wd)}catch(e){}
+      if(myid!==TTSID){done=true;return}
+      if(i>=chunks.length){finish();return}
+      var c=chunks[i],adv=false;
+      function go(){if(adv)return;adv=true;i++;next()}
+      var u=new SpeechSynthesisUtterance(c);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=1.02;u.pitch=1.02;
+      u.onend=go;u.onerror=go;
+      wd=setTimeout(go,Math.max(2600,c.length*95)+1600);
+      try{speechSynthesis.speak(u)}catch(e){go()}
+    }
+    next();
+  }catch(e){cb&&cb()}
 }
+function browserSay(t){speakSeq(t,null)}
 function say(t){
   t=speakable(t);stopSay();
   if(CAP.t){
@@ -253,7 +268,7 @@ function say(t){
   }
   browserSay(t);
 }
-function stopSay(){try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}}
+function stopSay(){TTSID++;try{if(window.S)S.speaking=false}catch(e){}ttsKeepAlive(false);try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}}
 try{if('speechSynthesis' in window)speechSynthesis.onvoiceschanged=function(){VOICE=pickVoice()}}catch(e){}
 function stepText(){
   if(S.flow==='wash')return 'Lavado de manos, paso '+(S.i+1)+' de '+WASH.length+'. '+WASH[S.i];
@@ -540,23 +555,7 @@ function sayThen(t,cb){
   if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
 }
-function browserSayThen(t,cb){
-  try{
-    if(!('speechSynthesis' in window)){cb&&cb();return}
-    speechSynthesis.cancel();if(!VOICE)VOICE=pickVoice();
-    var parts=t.split(/(?<=[.!?:])\s+/).filter(Boolean);if(!parts.length){cb&&cb();return}
-    var total=parts.length,ended=0,called=false,ri=null;
-    function finish(){if(called)return;called=true;try{clearInterval(ri)}catch(e){}cb&&cb()}
-    ri=setInterval(function(){try{if(speechSynthesis.speaking)speechSynthesis.resume()}catch(e){}},1200);
-    var tm=setTimeout(finish,Math.max(2500,t.length*70)+1200);
-    parts.forEach(function(part){
-      var u=new SpeechSynthesisUtterance(part);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=1.04;u.pitch=1.02;
-      u.onend=function(){ended++;if(ended>=total){clearTimeout(tm);finish()}};
-      u.onerror=function(){ended++;if(ended>=total){clearTimeout(tm);finish()}};
-      speechSynthesis.speak(u);
-    });
-  }catch(e){cb&&cb()}
-}
+function browserSayThen(t,cb){speakSeq(t,cb)}
 var CYES=/\b(si+|sip|dale|listo|ya esta|ya|seguimos|segui|segu[ií]|continuar|continua|continu[eé]|siguiente|proximo|adelante|okey|ok|correcto|hecho|perfecto|bueno)\b/;
 function isWait(n){return /\b(todavia|todav[ií]a|espera|esper[aá]|esperame|esper[aá]me|pera|aguanta|aguant[aá]|aun no|a[uú]n no|ahora no|pausa|para un|dame un|un segundo|un momento|un minuto)\b/.test(n)||/^(no|nono|no no)$/.test(n.trim())}
 function isAdv(n){
