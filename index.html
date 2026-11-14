@@ -259,6 +259,7 @@ function vHome(){
    +'<p class="sub">Sistema Andy Disc de bolsas, para diálisis peritoneal. Una cosa a la vez, a su ritmo.</p>'
    +cont
    +'<button class="btn primary" data-act="start">'+(cont?'Empezar desde el principio':'Empezar')+IC.next+'</button>'
+   +'<button class="btn primary" data-act="convostart">'+IC.mic+'Modo manos libres</button>'
    +'<button class="btn" data-act="index">'+IC.list+'Ver todos los pasos</button>'
    +'<button class="btn" data-act="ask">'+IC.mic+'Hacer una pregunta</button>'
    +'<button class="btn" data-act="log">Mi registro de cambios</button>'
@@ -293,7 +294,9 @@ function vStep(){
   var last=wash?n===total:n===total;
   var nextLabel=wash?(last?'Listo, volver a la guía':'Siguiente'):(last?'Terminar':'Siguiente');
   var bar='<div class="bar"><div class="wrap">'
-   +'<button class="btn primary" data-act="next">'+nextLabel+(last&&!wash?'':IC.next)+'</button>'
+   +(S.convo
+     ?'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 Manos libres. Diga «sí» para seguir.</p><button class="btn danger" data-act="convostop">Detener manos libres</button>'
+     :'<button class="btn primary" data-act="next">'+nextLabel+(last&&!wash?'':IC.next)+'</button>')
    +'<div class="row3">'
    +'<button class="btn soft" data-act="prev" '+((S.i===0&&!wash)?'':'')+'>'+IC.prev+'Atrás</button>'
    +'<button class="btn" data-act="ask">'+IC.mic+'Preguntar</button>'
@@ -431,7 +434,7 @@ function discReal(k){return '<div class="artbox"><div class="rd"><img src="'+PH[
 var CAP={d:null,s:null,t:null};
 S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
 S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
-S.mt={id:'q',cb:null};
+S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
 S.nick=ld('nick','');S.nm='';S.nerr='';
 if(!S.nick)S.view='name';
 try{S.log=JSON.parse(ld('log','[]'))||[]}catch(e){S.log=[]}
@@ -474,12 +477,68 @@ function toggleMic(t){
   CAP.d.start().catch(function(e){S.auto=false;var n=document.querySelector('.micnote');if(n){n.hidden=false;n.textContent='No se pudo usar el micrófono. Escriba la respuesta o use el micrófono del teclado.'}});
 }
 function hookDict(d){
-  d.onPartial(function(r){var q=document.getElementById(S.mt.id);if(q)q.value=(S.base+' '+r.text).trim()});
-  d.onFinal(function(r){S.base=(S.base+' '+r.text).trim();var q=document.getElementById(S.mt.id);if(q)q.value=S.base});
+  d.onPartial(function(r){if(S.convo)return;var q=document.getElementById(S.mt.id);if(q)q.value=(S.base+' '+r.text).trim()});
+  d.onFinal(function(r){if(S.convo){convoHeard(r.text);return}S.base=(S.base+' '+r.text).trim();var q=document.getElementById(S.mt.id);if(q)q.value=S.base});
   d.onState(function(r){
     S.listening=(r.state==='listening');setMic();
+    if(S.convo){if(r.state==='idle')setTimeout(convoOnRecEnd,200);return}
     if(r.state==='idle'&&S.auto){S.auto=false;var q=document.getElementById(S.mt.id);if(q&&q.value.trim()&&S.mt.cb)S.mt.cb(q.value)}
   });
+}
+/* ---------- modo conversacion (manos libres) ---------- */
+function sayThen(t,cb){
+  t=speakable(t);var done=false;function fin(){if(done)return;done=true;try{cb&&cb()}catch(e){}}
+  if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:.92,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
+  browserSayThen(t,fin);
+}
+function browserSayThen(t,cb){
+  try{
+    if(!('speechSynthesis' in window)){cb&&cb();return}
+    speechSynthesis.cancel();if(!VOICE)VOICE=pickVoice();
+    var parts=t.split(/(?<=[.!?:])\s+/).filter(Boolean);if(!parts.length){cb&&cb();return}
+    var last=parts.length-1,called=false;
+    var tm=setTimeout(function(){if(!called){called=true;cb&&cb()}},Math.max(2500,t.length*75)+1500);
+    parts.forEach(function(part,idx){
+      var u=new SpeechSynthesisUtterance(part);u.lang=VOICE?VOICE.lang:'es-AR';if(VOICE)u.voice=VOICE;u.rate=.9;
+      if(idx===last)u.onend=function(){if(!called){called=true;clearTimeout(tm);cb&&cb()}};
+      speechSynthesis.speak(u);
+    });
+  }catch(e){cb&&cb()}
+}
+var CYES=/\b(si+|sip|dale|listo|ya esta|ya|seguimos|segui|segu[ií]|continuar|continua|continu[eé]|siguiente|proximo|adelante|okey|ok|correcto|hecho|perfecto|bueno)\b/;
+function convoStart(){
+  if(!CAP.d){say('El modo manos libres necesita micrófono. Use los botones grandes.');return}
+  S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
+  sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoStep()});
+}
+function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
+function convoStep(){if(!S.convo)return;S.convoAskedAt=0;sayThen(stepText(),function(){if(S.convo)convoListen()})}
+function convoListen(){if(!S.convo||!CAP.d)return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
+function convoHeard(text){
+  if(!S.convo)return;S.heard=true;var n=norm(text);
+  if(/\b(terminar|salir|parar|basta|apaga|apagar|manos libres|detener|silencio)\b/.test(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
+  if(/\b(atras|anterior|volver)\b/.test(n)){if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
+  if(/\b(repet|de nuevo|otra vez|no entiendo|no escuche|repita)\b/.test(n)){convoStep();return}
+  if(CYES.test(n)){convoNext();return}
+  if(/\b(no|todavia|espere|espera|pera|aun no|aguante|pausa|todav[ií]a)\b/.test(n)){sayThen('Bueno'+nn()+'. Cuando esté listo, diga sí.',function(){if(S.convo)convoListen()});return}
+  convoAnswer(text);
+}
+function convoNext(){
+  if(S.flow==='wash'){if(S.i>=WASH.length-1){go(S.back,'main');if(S.convo)convoStep();}else{S.i++;render();convoStep()}return}
+  if(S.i>=STEPS.length-1){sayThen('Terminó el procedimiento. Muy bien'+nn()+'. Gracias por hacerlo con cuidado.',null);S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}sv('i',0);S.saved=0;S.view='done';render();window.scrollTo(0,0);return}
+  S.i++;sv('i',S.i);S.saved=S.i;render();window.scrollTo(0,0);convoStep();
+}
+function convoAnswer(q){
+  var loc=localAnswer(q,norm(q));
+  function then(r){sayThen(r.t,function(){if(S.convo){S.convoAskedAt=Date.now();sayThen('¿Seguimos?',function(){if(S.convo)convoListen()})}})}
+  if(loc.final||!CAP.s){then(loc);return}
+  claudeAnswer(q).then(then).catch(function(){then(loc)});
+}
+function convoOnRecEnd(){
+  if(!S.convo||S.heard)return;
+  var now=Date.now();
+  if(now-S.convoAskedAt>11000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
+  else convoListen();
 }
 /* Dictado con la voz del navegador (reemplaza claude.use('dictation') en la version alojada).
    Mismo contrato que espera hookDict: onPartial/onFinal/onState + start()/stop() que devuelven Promise. */
@@ -785,6 +844,8 @@ app.addEventListener('click',function(e){
       break;
     case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];logSave();S.logConfirm=false;render()}break;
     case 'resume':go(S.saved,'main');break;
+    case 'convostart':if(S.view!=='step'){go(S.saved||0,'main')}convoStart();break;
+    case 'convostop':convoStop();break;
     case 'next':
       if(S.flow==='wash'){ if(S.i>=WASH.length-1){go(S.back,'main')}else go(S.i+1,'wash') }
       else if(S.i===17&&!(S.rec&&S.rec.drained!=null)&&!S.skip){S.nag=true;render();say('Falta anotar cuánto líquido sacó.')}
@@ -795,16 +856,16 @@ app.addEventListener('click',function(e){
       if(S.flow==='wash'){ if(S.i===0)go(S.back,'main');else go(S.i-1,'wash') }
       else if(S.i>0)go(S.i-1,'main'); else{stopCount();S.view='home';render()}
       break;
-    case 'speak':case 'speak2':say(stepText());break;
-    case 'help':S.help=true;render();break;
+    case 'speak':case 'speak2':if(S.convo){convoStep();}else say(stepText());break;
+    case 'help':if(S.convo)convoStop();S.help=true;render();break;
     case 'closehelp':S.help=false;render();break;
-    case 'index':S.help=false;S.back=1;stopCount();S.view='index';render();window.scrollTo(0,0);break;
+    case 'index':if(S.convo)convoStop();S.help=false;S.back=1;stopCount();S.view='index';render();window.scrollTo(0,0);break;
     case 'goto':S.back=0;go(+b.dataset.n,'main');break;
-    case 'home':stopCount();stopSay();S.help=false;S.view='home';render();window.scrollTo(0,0);break;
+    case 'home':if(S.convo)convoStop();stopCount();stopSay();S.help=false;S.view='home';render();window.scrollTo(0,0);break;
     case 'openwash':S.back=S.flow==='main'?S.i:S.back;go(0,'wash');break;
     case 'washonly':S.back=0;go(0,'wash');break;
     case 'count':count();break;
-    case 'ask':S.help=false;S.ask=true;S.ans=null;render();break;
+    case 'ask':if(S.convo)convoStop();S.help=false;S.ask=true;S.ans=null;render();break;
     case 'closeask':stopDict();S.ask=false;render();break;
     case 'sendq':askQ(document.getElementById('q').value);break;
     case 'chip':document.getElementById('q').value=b.dataset.q;askQ(b.dataset.q);break;
