@@ -125,6 +125,7 @@ textarea{font:inherit;font-size:.7em;width:100%;min-height:8em;padding:12px;bord
 .bigmic b{font-size:1.5em;font-weight:700;letter-spacing:.03em;line-height:1}
 .bigmic .micsub{font-size:.85em;font-weight:700;opacity:.92;text-align:center;line-height:1.1}
 @media (prefers-reduced-motion:no-preference){.bigmic{animation:breathe 2.6s ease-in-out infinite}@keyframes breathe{50%{transform:scale(1.025);box-shadow:0 18px 44px rgba(11,79,156,.45)}}}
+.callbtn{background:var(--hig-bg);border-color:var(--hig);color:var(--hig);text-decoration:none;font-size:.9em}
 .askrow{display:grid;gap:10px}
 input[type=text]{font:inherit;padding:16px;border:3px solid var(--line);border-radius:14px;background:var(--bg);color:var(--fg);width:100%}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -294,18 +295,24 @@ function vStep(){
     if(S.i===17)m+=reminderBox()+recPanel();
     if(S.i===19&&S.vol)m+='<p class="okbox">Infunda '+fmtL(S.vol)+'.</p>';
     if(p.count)m+='<div class="box stack"><div class="count" id="cnt" aria-live="polite">&nbsp;</div><button class="btn" data-act="count">Contar conmigo hasta 5</button></div>';
-    if(p.wash)m+='<button class="btn" data-act="openwash">Ver cómo se hace</button>';
+    if(p.wash){
+      if(S.washKnown){m+='<button class="btn soft" data-act="openwash">Ver cómo lavarse las manos</button>';}
+      else{m+='<div class="box stack"><p style="margin:0;font-weight:700;font-size:1.05em">¿Querés que te recuerde cómo se lavan las manos, paso a paso?</p><button class="btn primary" data-act="washyes">Sí, recordámelo</button><button class="btn" data-act="washno">No, ya sé</button></div>';}
+    }
   }
   m+='</main>';
   if(wash&&true){m=m.replace('<h1>','<h1 id="ttl" tabindex="-1">')}
   var last=wash?n===total:n===total;
   var nextLabel=wash?(last?'Listo, volver a la guía':'Siguiente'):(last?'Terminar':'Siguiente');
+  var topbtn;
+  if(S.convo){topbtn=(wash?'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 '+(S.washPaused?'En pausa. Diga «sigamos».':'Lavado guiado. Diga «pausa» para frenar.')+'</p>':'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 Manos libres. Diga «sí» para seguir.</p>')+'<button class="btn danger" data-act="convostop">Detener manos libres</button>';}
+  else if(wash&&S.washAuto){topbtn=(S.washPaused?'<button class="btn primary" data-act="washresume">'+IC.next+'Reanudar lavado</button>':'<button class="btn primary" data-act="washpause">⏸ Pausar lavado</button>');}
+  else{topbtn='<button class="btn primary" data-act="next">'+nextLabel+(last&&!wash?'':IC.next)+'</button>';}
   var bar='<div class="bar"><div class="wrap">'
-   +(S.convo
-     ?'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 Manos libres. Diga «sí» para seguir.</p><button class="btn danger" data-act="convostop">Detener manos libres</button>'
-     :'<button class="btn primary" data-act="next">'+nextLabel+(last&&!wash?'':IC.next)+'</button>')
+   +topbtn
+   +((!wash&&phoneBtn)?phoneBtn():'')
    +'<div class="row3">'
-   +'<button class="btn soft" data-act="prev" '+((S.i===0&&!wash)?'':'')+'>'+IC.prev+'Atrás</button>'
+   +'<button class="btn soft" data-act="prev">'+IC.prev+'Atrás</button>'
    +'<button class="btn" data-act="ask">'+IC.mic+'Preguntar</button>'
    +'<button class="btn soft" data-act="speak">'+IC.spk+'Escuchar</button>'
    +'<button class="btn" data-act="help">'+IC.help+'Ayuda</button>'
@@ -377,6 +384,7 @@ var ART={
 };
 var STEPART=['wash','door','cath','mask','table','bag','taper','wash','hang','organizer','cap','gel','guides','organizer','gel','','drain','scale','disc','disc','disc','clamp','gel','pin','toilet'];
 function artBox(k){var a=ART[k];if(!a)return '';return '<div class="artbox"><svg class="art" viewBox="0 0 240 150" role="img" aria-label="Dibujo: '+a[0]+'">'+a[1]+'</svg></div>'}
+IC.phone='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h4l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 2 6a2 2 0 0 1 2-2z"/></svg>';
 IC.micbig='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/></svg>';
 IC.mic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
 
@@ -443,6 +451,7 @@ var CAP={d:null,s:null,t:null};
 S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
 S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
 S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
+S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;
 S.nick=ld('nick','');S.nm='';S.nerr='';
 /* arranca en el inicio con el micrófono grande; el nombre es opcional (menú) */
 try{S.log=JSON.parse(ld('log','[]'))||[]}catch(e){S.log=[]}
@@ -530,19 +539,44 @@ function convoStart(){
   sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoStep()});
 }
 function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
-function convoStep(){if(!S.convo)return;S.convoAskedAt=0;sayThen(stepText(),function(){if(S.convo)convoListen()})}
+var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
+function convoStep(){
+  if(!S.convo)return;S.convoAskedAt=0;
+  if(S.flow==='main'&&S.i===7&&!S.washKnown){
+    S.washAsk=true;
+    sayThen(stepText()+' ¿Querés que te recuerde cómo se lavan las manos? Diga sí para verlo, o no para seguir.',function(){if(S.convo)convoListen()});
+    return;
+  }
+  sayThen(stepText(),function(){if(S.convo)convoListen()});
+}
 function convoListen(){if(!S.convo||!CAP.d)return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;var n=norm(text);
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
+  if(S.washAsk){
+    S.washAsk=false;
+    if(/\b(no|ya se|ya s[eé]|lo se|lo s[eé]|se lavar|siguiente|sigamos|segu|continu|salt|omit)\b/.test(n)){S.washKnown=true;sv('washknown','1');convoNext();return}
+    S.back=S.i;S.washPaused=false;go(0,'wash');convoStep();return;
+  }
+  if(S.flow==='wash'){
+    if(isPause(n)){S.washPaused=true;render();sayThen('En pausa'+nn()+'. Diga sigamos cuando quiera seguir.',function(){if(S.convo)convoListen()});return}
+    if(isBack(n)){S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
+    if(isRepeat(n)){convoStep();return}
+    if(isAdv(n)){S.washPaused=false;render();convoWashNext();return}
+    convoAnswer(text);return;
+  }
   if(isBack(n)){if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
   if(isRepeat(n)){convoStep();return}
   if(isAdv(n)){convoNext();return}
   if(isWait(n)){sayThen('Bueno'+nn()+'. Avíseme cuando siga.',function(){if(S.convo)convoListen()});return}
   convoAnswer(text);
 }
+function convoWashNext(){
+  if(S.i>=WASH.length-1){S.washAuto=false;S.washPaused=false;go(S.back,'main');if(S.convo)sayThen('Listo'+nn()+'. ¿Seguimos?',function(){if(S.convo)convoListen()});return}
+  S.i++;render();convoStep();
+}
 function convoNext(){
-  if(S.flow==='wash'){if(S.i>=WASH.length-1){go(S.back,'main');if(S.convo)convoStep();}else{S.i++;render();convoStep()}return}
+  if(S.flow==='wash'){convoWashNext();return}
   if(S.i>=STEPS.length-1){sayThen('Terminó el procedimiento. Muy bien'+nn()+'. Gracias por hacerlo con cuidado.',null);S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}sv('i',0);S.saved=0;S.view='done';render();window.scrollTo(0,0);return}
   S.i++;sv('i',S.i);S.saved=S.i;render();window.scrollTo(0,0);convoStep();
 }
@@ -554,9 +588,38 @@ function convoAnswer(q){
 }
 function convoOnRecEnd(){
   if(!S.convo||S.heard)return;
+  if(S.flow==='wash'){if(S.washPaused){convoListen()}else{convoWashNext()}return}
   var now=Date.now();
   if(now-S.convoAskedAt>11000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
   else convoListen();
+}
+/* ---------- lavado de manos fluido (sin voz: por tiempo) ---------- */
+function washPlay(){
+  if(S.flow!=='wash'||S.washPaused||S.convo)return;
+  sayThen('Paso '+(S.i+1)+' de '+WASH.length+'. '+WASH[S.i],function(){
+    if(S.flow!=='wash'||S.washPaused||S.convo)return;
+    clearTimeout(S.washTimer);S.washTimer=setTimeout(washNextAuto,1100);
+  });
+}
+function washNextAuto(){
+  if(S.flow!=='wash'||S.washPaused||S.convo)return;
+  if(S.i>=WASH.length-1){washEnd();return}
+  S.i++;render();washPlay();
+}
+function washEnd(){
+  S.washAuto=false;S.washPaused=false;clearTimeout(S.washTimer);
+  go(S.back,'main');
+}
+function washStartAuto(back){
+  S.washAuto=true;S.washPaused=false;S.back=back;go(0,'wash');
+  if(S.convo){convoStep()}else{washPlay()}
+}
+/* ---------- teléfono de la enfermera ---------- */
+function sayDigits(p){var d=String(p).replace(/\D/g,'');return d?d.split('').join(' '):String(p)}
+function telHref(p){return 'tel:'+String(p).replace(/[^0-9+]/g,'')}
+function phoneBtn(){
+  if(!S.phone)return '<button class="btn soft" data-act="help" style="min-height:56px">'+IC.phone+'Cargar teléfono de mi enfermera</button>';
+  return '<a class="btn callbtn" href="'+telHref(S.phone)+'">'+IC.phone+'Llamar a mi enfermera · '+esc(S.phone)+'</a>';
 }
 /* Dictado con la voz del navegador (reemplaza claude.use('dictation') en la version alojada).
    Mismo contrato que espera hookDict: onPartial/onFinal/onState + start()/stop() que devuelven Promise. */
@@ -591,6 +654,10 @@ var STOPW='que cual como donde cuando para con por una uno los las del esta este
 function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o enfermero. Llame a su centro de diálisis'+(S.phone?' al '+S.phone:'')+'.'}
 function localAnswer(q,n){
   var cur=S.view==='step'&&S.flow==='main'?S.i:(S.back||0);
+  if(/\b(telefono|tel[eé]fono|llamar|llama|numero|n[uú]mero|enfermera|enfermero)\b/.test(n)){
+    if(S.phone)return {t:'El teléfono de su enfermera es '+sayDigits(S.phone)+'. Toque el botón verde de llamar.',n:null,final:1};
+    return {t:'Todavía no está cargado el teléfono de su enfermera. Pídale a un familiar que lo cargue en Ayuda.',n:null,final:1};
+  }
   if(SAFE.test(n))return {t:safeText(),n:null,final:1};
   var m=n.match(/paso (\d{1,2})/);
   if(m&&+m[1]>=1&&+m[1]<=STEPS.length)return {t:stepSay(+m[1]-1),n:+m[1]-1,final:1};
@@ -821,7 +888,7 @@ function announce(){live.textContent=stepText()}
 function go(i,flow){
   stopCount();S.i=i;S.flow=flow||S.flow;S.view='step';S.help=false;S.ask=false;S.confirm=false;S.dpend=null;S.derr='';if(i!==17)S.nag=false;
   if(S.flow==='main')sv('i',i),S.saved=i;
-  render();window.scrollTo(0,0);announce();if(S.voice&&!S.convo)say(stepText());wake();
+  render();window.scrollTo(0,0);announce();if(S.voice&&!S.convo&&!S.washAuto)say(stepText());wake();
 }
 function stopCount(){if(timer){clearInterval(timer);timer=null}}
 var WORDS=['uno','dos','tres','cuatro','cinco'];
@@ -867,13 +934,13 @@ app.addEventListener('click',function(e){
     case 'convostart':S.convo=true;if(S.view!=='step'){go(S.saved||0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
     case 'next':
-      if(S.flow==='wash'){ if(S.i>=WASH.length-1){go(S.back,'main')}else go(S.i+1,'wash') }
+      if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i>=WASH.length-1){washEnd()}else{go(S.i+1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
       else if(S.i===17&&!(S.rec&&S.rec.drained!=null)&&!S.skip){S.nag=true;render();say('Falta anotar cuánto líquido sacó.')}
       else if(S.i>=STEPS.length-1){stopCount();stopSay();sv('i',0);S.saved=0;if(S.rec){S.rec.done=true;recSave()}S.view='done';render();window.scrollTo(0,0)}
       else go(S.i+1,'main');
       break;
     case 'prev':
-      if(S.flow==='wash'){ if(S.i===0)go(S.back,'main');else go(S.i-1,'wash') }
+      if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i===0)washEnd();else{go(S.i-1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
       else if(S.i>0)go(S.i-1,'main'); else{stopCount();S.view='home';render()}
       break;
     case 'speak':case 'speak2':if(S.convo){convoStep();}else say(stepText());break;
@@ -882,8 +949,12 @@ app.addEventListener('click',function(e){
     case 'index':if(S.convo)convoStop();S.help=false;S.back=1;stopCount();S.view='index';render();window.scrollTo(0,0);break;
     case 'goto':S.back=0;go(+b.dataset.n,'main');break;
     case 'home':if(S.convo)convoStop();stopCount();stopSay();S.help=false;S.view='home';render();window.scrollTo(0,0);break;
-    case 'openwash':S.back=S.flow==='main'?S.i:S.back;go(0,'wash');break;
-    case 'washonly':S.back=0;go(0,'wash');break;
+    case 'openwash':washStartAuto(S.flow==='main'?S.i:S.back);break;
+    case 'washonly':washStartAuto(0);break;
+    case 'washyes':washStartAuto(S.i);break;
+    case 'washno':S.washKnown=true;sv('washknown','1');render();if(S.i>=STEPS.length-1){S.view='done'}else go(S.i+1,'main');break;
+    case 'washpause':S.washPaused=true;clearTimeout(S.washTimer);stopSay();render();break;
+    case 'washresume':S.washPaused=false;render();washPlay();break;
     case 'count':count();break;
     case 'ask':if(S.convo)convoStop();S.help=false;S.ask=true;S.ans=null;render();break;
     case 'closeask':stopDict();S.ask=false;render();break;
