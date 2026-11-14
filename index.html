@@ -67,6 +67,8 @@ h1{font-size:1.9em;line-height:1.08;font-weight:700;overflow-wrap:break-word;hyp
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:2px solid var(--line);
   padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:6}
 .bar .wrap{display:grid;gap:10px}
+.row2big{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+.row2big .btn{min-height:76px;font-size:1em}
 .row3{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .row3 .btn{min-height:62px;font-size:.68em;flex-direction:column;gap:4px;padding:8px 2px;border-radius:14px}
 .row3 .btn svg{width:1.5em;height:1.5em}
@@ -272,6 +274,7 @@ function vHome(){
    +'<button class="btn soft" data-act="help">Letra más grande y voz</button>'
    +'<button class="btn soft" data-act="index">Ver todos los pasos</button>'
    +'<button class="btn soft" data-act="log">Mi registro</button>'
+   +'<button class="btn soft" data-act="phones">Teléfonos</button>'
    +'<button class="btn soft" data-act="washonly">Lavado de manos</button>'
    +'<button class="btn soft" data-act="rename">Cambiar mi nombre</button>'
    +'<p class="note">Guía del sistema Andy Disc (Nefra Medical Care). Acompaña el entrenamiento de su enfermera o enfermero, no lo reemplaza.</p>'
@@ -302,21 +305,36 @@ function vStep(){
   }
   m+='</main>';
   if(wash&&true){m=m.replace('<h1>','<h1 id="ttl" tabindex="-1">')}
+  if(S.convo){
+    var graphic=wash?artBox('wash'):(p.disc?('<div class="artbox">'+discSvg(p.disc.k)+'</div>'+discReal(p.disc.k)):(PHMAP[S.i]?photoStep(PHMAP[S.i]):artBox(STEPART[S.i])));
+    m='<main>'+(wash?'<span class="pill hig">Higiene</span>':(p.tag?'<span class="pill '+p.k+'">'+p.tag+'</span>':''))
+      +(wash?'':'<span class="stepbadge"><b>'+n+'</b><span>de '+STEPS.length+'</span></span>')
+      +'<h1 id="ttl" tabindex="-1">'+(wash?WASH[S.i]:p.t)+'</h1>'+graphic+'</main>';
+  }
   var last=wash?n===total:n===total;
   var nextLabel=wash?(last?'Listo, volver a la guía':'Siguiente'):(last?'Terminar':'Siguiente');
   var topbtn;
   if(S.convo){topbtn=(wash?'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 '+(S.washPaused?'En pausa. Diga «sigamos».':'Lavado guiado. Diga «pausa» para frenar.')+'</p>':'<p class="okbox" style="margin:0 0 4px;text-align:center">🎤 Manos libres. Diga «sí» para seguir.</p>')+'<button class="btn danger" data-act="convostop">Detener manos libres</button>';}
   else if(wash&&S.washAuto){topbtn=(S.washPaused?'<button class="btn primary" data-act="washresume">'+IC.next+'Reanudar lavado</button>':'<button class="btn primary" data-act="washpause">⏸ Pausar lavado</button>');}
   else{topbtn='<button class="btn primary" data-act="next">'+nextLabel+(last&&!wash?'':IC.next)+'</button>';}
-  var bar='<div class="bar"><div class="wrap">'
-   +topbtn
-   +((!wash&&phoneBtn)?phoneBtn():'')
-   +'<div class="row3">'
-   +'<button class="btn soft" data-act="prev">'+IC.prev+'Atrás</button>'
-   +'<button class="btn" data-act="ask">'+IC.mic+'Preguntar</button>'
-   +'<button class="btn soft" data-act="speak">'+IC.spk+'Escuchar</button>'
-   +'<button class="btn" data-act="help">'+IC.help+'Ayuda</button>'
-   +'</div></div></div>';
+  var bar;
+  if(S.convo){
+    bar='<div class="bar"><div class="wrap">'+topbtn
+     +'<div class="row2big">'
+     +'<button class="btn soft" data-act="convoback">'+IC.prev+'Atrás</button>'
+     +'<button class="btn primary" data-act="convonext">Adelante'+IC.next+'</button>'
+     +'</div></div></div>';
+  }else{
+    bar='<div class="bar"><div class="wrap">'
+     +topbtn
+     +phoneBtn()
+     +'<div class="row3">'
+     +'<button class="btn soft" data-act="prev">'+IC.prev+'Atrás</button>'
+     +'<button class="btn" data-act="ask">'+IC.mic+'Preguntar</button>'
+     +'<button class="btn soft" data-act="speak">'+IC.spk+'Escuchar</button>'
+     +'<button class="btn" data-act="help">'+IC.help+'Ayuda</button>'
+     +'</div></div></div>';
+  }
   return h+m+bar;
 }
 function vIndex(){
@@ -597,18 +615,26 @@ function convoHeard(text){
     if(/\b(no|ya se|ya s[eé]|lo se|lo s[eé]|se lavar|siguiente|sigamos|segu|continu|salt|omit)\b/.test(n)){S.washKnown=true;sv('washknown','1');convoNext();return}
     S.back=S.i;S.washPaused=false;go(0,'wash');convoStep();return;
   }
+  if(isPhonesIntent(n)){S.convoAskedAt=Date.now();openPhones(true);return}
   if(S.flow==='wash'){
     if(isPause(n)){S.washPaused=true;render();sayThen('En pausa'+nn()+'. Diga sigamos cuando quiera seguir.',function(){if(S.convo)convoListen()});return}
     if(isBack(n)){S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
     if(isRepeat(n)){convoStep();return}
     if(isAdv(n)){S.washPaused=false;render();convoWashNext();return}
-    convoAnswer(text);return;
+    convoMaybe(text);return;
   }
+  if(isPause(n)||isWait(n)){S.convoAskedAt=Date.now();sayThen('Bueno'+nn()+'. Avíseme cuando quiera seguir.',function(){if(S.convo)convoListen()});return}
   if(isBack(n)){if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
   if(isRepeat(n)){convoStep();return}
   if(isAdv(n)){convoNext();return}
-  if(isWait(n)){sayThen('Bueno'+nn()+'. Avíseme cuando siga.',function(){if(S.convo)convoListen()});return}
-  convoAnswer(text);
+  convoMaybe(text);
+}
+var isPhonesIntent=function(n){return /\b(telefono|tel[eé]fono|telefonos|tel[eé]fonos|llamar|numero|n[uú]mero|numeros|n[uú]meros|guardia|enfermeria|enfermer[ií]a|fresenius)\b/.test(n)};
+function convoMaybe(text){
+  var n=norm(text),wc=text.trim().split(/\s+/).filter(Boolean).length;
+  var isQ=/\b(que|qu[eé]|como|c[oó]mo|donde|d[oó]nde|cuando|cu[aá]ndo|cuanto|cu[aá]nto|por que|para que|cual|cu[aá]l|cada cuanto)\b/.test(n)||/\?/.test(text);
+  if(isQ&&wc>=2){convoAnswer(text);return}
+  convoListen();
 }
 function convoWashNext(){
   if(S.i>=WASH.length-1){S.washAuto=false;S.washPaused=false;go(S.back,'main');if(S.convo)sayThen('Listo'+nn()+'. ¿Seguimos?',function(){if(S.convo)convoListen()});return}
@@ -629,7 +655,7 @@ function convoOnRecEnd(){
   if(!S.convo||S.heard)return;
   if(S.flow==='wash'){convoListen();return}
   var now=Date.now();
-  if(now-S.convoAskedAt>11000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
+  if(now-S.convoAskedAt>22000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
   else convoListen();
 }
 /* ---------- lavado de manos fluido (sin voz: por tiempo) ---------- */
@@ -657,8 +683,29 @@ function washStartAuto(back){
 function sayDigits(p){var d=String(p).replace(/\D/g,'');return d?d.split('').join(' '):String(p)}
 function telHref(p){return 'tel:'+String(p).replace(/[^0-9+]/g,'')}
 function phoneBtn(){
-  if(!S.phone)return '<button class="btn soft" data-act="help" style="min-height:56px">'+IC.phone+'Cargar teléfono de mi enfermera</button>';
+  if(!S.phone)return '<button class="btn soft" data-act="phones" style="min-height:56px">'+IC.phone+'Teléfonos</button>';
   return '<a class="btn callbtn" href="'+telHref(S.phone)+'">'+IC.phone+'Llamar a mi enfermera · '+esc(S.phone)+'</a>';
+}
+var FRESENIUS=[
+  {n:'Enfermería (guardia)',t:'+54 9 2994 69-2608'},
+  {n:'Guardia médica',t:'+54 9 2994 69-2609'},
+  {n:'Servicio 7 a 15 (Natalia)',t:'+54 9 2994 72-9878'}
+];
+function vPhones(){
+  var o='<header class="top"><div class="toprow"><span>Teléfonos</span></div></header><main style="padding-block:16px 40px"><div class="stack">'
+   +'<button class="btn" data-act="'+(S.convo?'closephones':'home')+'">'+IC.prev+(S.convo?'Volver':'Volver al inicio')+'</button>';
+  if(S.phone)o+='<p class="phase" style="margin:6px 0 0">Mi enfermera</p><a class="btn callbtn" href="'+telHref(S.phone)+'">'+IC.phone+'Llamar · '+esc(S.phone)+'</a>';
+  o+='<p class="phase" style="margin:10px 0 0">Fresenius Nefra</p>';
+  FRESENIUS.forEach(function(f){o+='<a class="btn callbtn" href="'+telHref(f.t)+'">'+IC.phone+esc(f.n)+' · '+esc(f.t)+'</a>'});
+  o+='<p class="note">Tóquelos para llamar. También puede decir «teléfonos» por voz.</p>'
+   +'</div></main>';
+  return o;
+}
+function phonesSay(){var t='Teléfonos. '+(S.phone?'Su enfermera, '+sayDigits(S.phone)+'. ':'');FRESENIUS.forEach(function(f){t+=f.n+', '+sayDigits(f.t)+'. '});return t}
+function openPhones(read){
+  S.prevView=S.view;S.view='phones';S.help=false;S.ask=false;render();window.scrollTo(0,0);
+  if(read&&S.convo)sayThen(phonesSay(),function(){if(S.convo)convoListen()});
+  else if(read)say(phonesSay());
 }
 /* Dictado con la voz del navegador (reemplaza claude.use('dictation') en la version alojada).
    Mismo contrato que espera hookDict: onPartial/onFinal/onState + start()/stop() que devuelven Promise. */
@@ -694,9 +741,9 @@ var STOPW='que cual como donde cuando para con por una uno los las del esta este
 function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o enfermero. Llame a su centro de diálisis'+(S.phone?' al '+S.phone:'')+'.'}
 function localAnswer(q,n){
   var cur=S.view==='step'&&S.flow==='main'?S.i:(S.back||0);
-  if(/\b(telefono|tel[eé]fono|llamar|llama|numero|n[uú]mero|enfermera|enfermero)\b/.test(n)){
+  if(/\b(telefono|tel[eé]fono|llamar|numero|n[uú]mero)\b/.test(n)){
     if(S.phone)return {t:'El teléfono de su enfermera es '+sayDigits(S.phone)+'. Toque el botón verde de llamar.',n:null,final:1};
-    return {t:'Todavía no está cargado el teléfono de su enfermera. Pídale a un familiar que lo cargue en Ayuda.',n:null,final:1};
+    return {t:'Mire la lista de teléfonos en la pantalla y toque Llamar.',n:null,final:1};
   }
   if(SAFE.test(n))return {t:safeText(),n:null,final:1};
   var m=n.match(/paso (\d{1,2})/);
@@ -723,6 +770,7 @@ function claudeAnswer(q){
 }
 function askQ(q){
   q=(q||'').trim();if(!q)return;var n=norm(q);
+  if(isPhonesIntent(n)){S.ask=false;openPhones(true);return}
   if(isAdv(n)){S.ask=false;render();var nb=document.querySelector('[data-act=next]');if(nb)nb.click();return}
   if(isBack(n)){S.ask=false;render();var pb=document.querySelector('[data-act=prev]');if(pb)pb.click();return}
   var jj=jumpIntent(n);
@@ -917,7 +965,7 @@ function pickNick(n){
 function render(){
   document.documentElement.style.setProperty('--fs',S.fs);
   var h;
-  if(S.view==='name')h=vName();else if(S.view==='home')h=vHome();else if(S.view==='vol')h=vVol();else if(S.view==='log')h=vLog();else if(S.view==='index')h=vIndex();else if(S.view==='done')h=vDone();else h=vStep();
+  if(S.view==='name')h=vName();else if(S.view==='home')h=vHome();else if(S.view==='vol')h=vVol();else if(S.view==='log')h=vLog();else if(S.view==='phones')h=vPhones();else if(S.view==='index')h=vIndex();else if(S.view==='done')h=vDone();else h=vStep();
   if(S.help)h+=vHelp();
   if(S.ask){h+=vAsk()}
   app.innerHTML=h;
@@ -967,6 +1015,8 @@ app.addEventListener('click',function(e){
     case 'dfix':if(S.rec){S.rec.drained=null;S.dpend=null}render();break;
     case 'asp':if(S.rec){S.rec.asp=(S.rec.asp===b.dataset.a?'':b.dataset.a);recSave();render();if(S.rec.asp==='t'||S.rec.asp==='s')say('Líquido '+ASP[S.rec.asp].toLowerCase()+'. Avise a su enfermera o enfermero antes de seguir.')}break;
     case 'skiprec':S.skip=true;S.nag=false;go(S.i+1,'main');break;
+    case 'phones':if(S.convo){openPhones(false)}else{stopSay();S.prevView='home';S.view='phones';render();window.scrollTo(0,0)}break;
+    case 'closephones':S.view=(S.prevView==='step'?'step':'home');render();window.scrollTo(0,0);if(S.convo)convoStep();break;
     case 'log':stopSay();S.view='log';S.logConfirm=false;render();window.scrollTo(0,0);break;
     case 'logcopy':
       var tx=document.getElementById('logtxt'),cm=document.getElementById('copymsg');
@@ -976,6 +1026,8 @@ app.addEventListener('click',function(e){
     case 'resume':go(S.saved,'main');break;
     case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
+    case 'convonext':clearTimeout(S.washTimer);S.heard=true;if(S.flow==='wash'){S.washPaused=false;convoWashNext()}else{convoNext()}break;
+    case 'convoback':clearTimeout(S.washTimer);S.heard=true;S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();break;
     case 'next':
       if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i>=WASH.length-1){washEnd()}else{go(S.i+1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
       else if(S.i===17&&!(S.rec&&S.rec.drained!=null)&&!S.skip){S.nag=true;render();say('Falta anotar cuánto líquido sacó.')}
