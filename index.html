@@ -107,6 +107,11 @@ input[type=tel]{font:inherit;padding:14px;border:3px solid var(--line);border-ra
 .warnbox{background:var(--key-bg);color:var(--key)}
 .bigv{font-size:2.2em;font-weight:700;line-height:1.1;margin:0;font-variant-numeric:tabular-nums}
 .logrow{border:2px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:4px;font-size:.85em}
+.tablewrap{overflow-x:auto;border:2px solid var(--line);border-radius:14px}
+.rtab{border-collapse:collapse;width:100%;font-size:.8em;font-variant-numeric:tabular-nums}
+.rtab th,.rtab td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.rtab th{background:var(--surface);color:var(--muted);font-weight:700}
+.rtab tr:last-child td{border-bottom:0}
 .logrow b{font-size:1.05em}
 textarea{font:inherit;font-size:.7em;width:100%;min-height:8em;padding:12px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg)}
 .photo{position:relative;max-width:380px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden}
@@ -469,10 +474,12 @@ var CAP={d:null,s:null,t:null};
 S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
 S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
 S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
-S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;
+S.volAsk=false;S.werr='';S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;
 S.nick=ld('nick','');S.nm='';S.nerr='';
 /* arranca en el inicio con el micrófono grande; el nombre es opcional (menú) */
 try{S.log=JSON.parse(ld('log','[]'))||[]}catch(e){S.log=[]}
+try{S.weights=JSON.parse(ld('weights','{}'))||{}}catch(e){S.weights={}}
+S.weighAsk=false;
 
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function norm(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
@@ -503,7 +510,7 @@ function setMic(){
     b.innerHTML=IC.mic+(S.listening&&b.dataset.t===S.mt.id?'Escuchando… toque para terminar':'Hablar');}
   var ns=document.querySelectorAll('.micnote');for(var j=0;j<ns.length;j++)ns[j].hidden=!!CAP.d;
 }
-var MICCB={nq:function(v){submitName(v)},q:function(v){askQ(v)},dq:function(v){submitDrain(v)},vq:function(v){submitVol(v)}};
+var MICCB={nq:function(v){submitName(v)},q:function(v){askQ(v)},dq:function(v){submitDrain(v)},vq:function(v){submitVol(v)},wq:function(v){}};
 function toggleMic(t){
   if(!CAP.d)return;
   if(S.listening){CAP.d.stop().catch(function(){});return}
@@ -575,7 +582,16 @@ function jumpIntent(n){
 function convoStart(){
   if(!CAP.d){say('El modo manos libres necesita micrófono. Use los botones grandes.');return}
   S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
-  sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoStep()});
+  sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoBegin()});
+}
+function convoBegin(){
+  if(!S.convo)return;
+  var k=todayKey();
+  if(!(S.weights[k]&&S.weights[k].antes!=null)){S.weighAsk='antes';sayThen('Antes de empezar. ¿Quiere anotar su peso de hoy? Diga el peso en kilos, por ejemplo setenta y dos. O diga no.',function(){if(S.convo)convoListen()});return}
+  convoStep();
+}
+function convoFinishDone(){
+  sayThen('Muy bien'+nn()+'. Gracias por hacerlo con cuidado.',null);S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}sv('i',0);S.saved=0;S.view='done';render();window.scrollTo(0,0);
 }
 function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
@@ -588,7 +604,16 @@ function convoStep(){
     sayThen(stepText()+' ¿Querés que te recuerde cómo se lavan las manos? Diga sí para verlo, o no para seguir.',function(){if(S.convo)convoListen()});
     return;
   }
+  if(S.flow==='main'&&S.i===17&&!(S.rec&&S.rec.drained!=null)&&!S.skip){
+    S.volAsk=true;
+    sayThen(stepText()+' ¿Cuánto líquido sacó? Dígalo en litros. Por ejemplo, un litro y medio.',function(){if(S.convo)convoListen()});
+    return;
+  }
   sayThen(stepText(),function(){if(S.convo)convoListen()});
+}
+function convoRecordDrain(ml){
+  if(!S.rec)S.rec={id:Date.now(),drained:null,asp:'',done:false};
+  S.rec.drained=ml;recSave();S.nag=false;render();
 }
 /* lavado fluido en voz: lee solo la indicación y avanza solo tras una pausa; escucha "pausa" para frenar */
 function convoWashRead(){
@@ -607,6 +632,32 @@ function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
+  if(S.weighAsk){
+    var wk=S.weighAsk,kg=parseKg(text);
+    if(kg!=null){
+      var aprox=/\b(aproximad|mas o menos|masomenos|como|cerca de|alrededor|alredor|alre|ponele|creo|serian|seran|sera|debe ser|anda en|por ahi)\b/.test(n);
+      S.weighAsk=false;saveWeight(wk,kg,aprox);render();
+      var t='Anoté '+fmtKg(kg)+(aprox?', aproximado. No se olvide de pesarse en la balanza.':'.');
+      sayThen(t,function(){if(wk==='antes'){if(S.convo)convoStep()}else{convoFinishDone()}});return;
+    }
+    if(/\b(no|despues|mas tarde|salt|omit|no quiero|no gracias|no hoy|no se|no lo se|no me pese|sin pesar)\b/.test(n)){S.weighAsk=false;sayThen('Está bien'+nn()+'. No se olvide de pesarse en la balanza.',function(){if(wk==='antes'){if(S.convo)convoStep()}else{convoFinishDone()}});return}
+    sayThen('No entendí el peso. Dígalo en kilos, por ejemplo setenta y dos. Si no está seguro, diga un número aproximado.',function(){if(S.convo)convoListen()});return;
+  }
+  if(S.volAsk){
+    if(isBack(n)){S.volAsk=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
+    if(/\bcorregir|cambiar|otra vez|de nuevo|me equivoque\b/.test(n)){sayThen('Bueno. ¿Cuánto líquido sacó?',function(){if(S.convo)convoListen()});return}
+    if(/\b(no se|no lo se|no se cuanto|despues|mas tarde|salt|omit|no quiero anotar|no anotar|sin anotar)\b/.test(n)){S.volAsk=false;S.skip=true;sayThen('Está bien'+nn()+'. ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});return}
+    var ml=parseVol(text);
+    if(ml!=null){
+      S.volAsk=false;convoRecordDrain(ml);
+      var t='Anoté '+fmtL(ml)+'.';
+      if(S.vol){t+=ml>=S.vol?' Sacó lo mismo o más de lo que infundió. Muy bien.':' Sacó menos de lo que infundió. Antes de infundir de nuevo, avise a su enfermera.';}
+      sayThen(t+' ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});
+      return;
+    }
+    sayThen('No entendí la cantidad. ¿Cuánto líquido sacó? Por ejemplo, un litro y medio, o mil quinientos.',function(){if(S.convo)convoListen()});
+    return;
+  }
   var jj=jumpIntent(n);
   if(jj===-2){S.washAsk=false;washStartAuto(S.flow==='main'?S.i:S.back);return}
   if(jj>=0){S.washAsk=false;S.flow='main';S.i=jj;sv('i',jj);S.saved=jj;render();window.scrollTo(0,0);convoStep();return}
@@ -642,7 +693,11 @@ function convoWashNext(){
 }
 function convoNext(){
   if(S.flow==='wash'){convoWashNext();return}
-  if(S.i>=STEPS.length-1){sayThen('Terminó el procedimiento. Muy bien'+nn()+'. Gracias por hacerlo con cuidado.',null);S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}sv('i',0);S.saved=0;S.view='done';render();window.scrollTo(0,0);return}
+  if(S.i>=STEPS.length-1){
+    var kk=todayKey();
+    if(!(S.weights[kk]&&S.weights[kk].despues!=null)){S.weighAsk='despues';sayThen('Terminó el procedimiento. ¿Quiere anotar su peso ahora, al terminar? Diga el peso, o diga no.',function(){if(S.convo)convoListen()});return}
+    convoFinishDone();return;
+  }
   S.i++;sv('i',S.i);S.saved=S.i;render();window.scrollTo(0,0);convoStep();
 }
 function convoAnswer(q){
@@ -706,6 +761,24 @@ function openPhones(read){
   S.prevView=S.view;S.view='phones';S.help=false;S.ask=false;render();window.scrollTo(0,0);
   if(read&&S.convo)sayThen(phonesSay(),function(){if(S.convo)convoListen()});
   else if(read)say(phonesSay());
+}
+function vWeigh(){
+  return '<header class="top"><div class="toprow"><span>Mi peso</span></div></header><main style="padding-block:16px 40px"><div class="stack">'
+   +'<button class="btn" data-act="log">Volver al registro</button>'
+   +'<h1 class="title-big" style="font-size:1.5em">¿Cuánto pesa?</h1>'
+   +'<p class="sub">En kilos. Puede decirlo o escribirlo. Si no está seguro, un número aproximado.</p>'
+   +'<button class="btn micb" data-act="mic" data-t="wq" '+(CAP.d?'':'hidden')+'>'+IC.mic+'Hablar</button>'
+   +'<div class="askrow"><input id="wq" type="text" inputmode="decimal" autocomplete="off" placeholder="Por ejemplo 72"></div>'
+   +'<p class="note micnote" '+(CAP.d?'hidden':'')+'>Para hablar, use el micrófono del teclado.</p>'
+   +(S.werr?'<p class="warnbox">'+S.werr+'</p>':'')
+   +'<button class="btn primary" data-act="wsaveA">Guardar como ANTES del tratamiento</button>'
+   +'<button class="btn primary" data-act="wsaveD">Guardar como DESPUÉS del tratamiento</button>'
+   +'</div></main>';
+}
+function saveWeighFromInput(kind){
+  var v=document.getElementById('wq'),kg=v?parseKg(v.value):null;
+  if(kg==null){S.werr='No entendí el peso. Escriba por ejemplo 72 o 72,5.';render();return}
+  S.werr='';saveWeight(kind,kg,false);S.view='log';render();window.scrollTo(0,0);say('Anoté '+fmtKg(kg)+', '+(kind==='antes'?'antes del tratamiento':'después del tratamiento')+'.');
 }
 /* Dictado con la voz del navegador (reemplaza claude.use('dictation') en la version alojada).
    Mismo contrato que espera hookDict: onPartial/onFinal/onState + start()/stop() que devuelven Promise. */
@@ -826,7 +899,29 @@ function diffText(out,plan){
   if(!plan)return '';var d=out-plan;
   return d>=0?(d===0?'igual a lo infundido':'+'+d+' mL, de más'):('faltaron '+(-d)+' mL');
 }
+function todayKey(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function dayLabel(k){var p=k.split('-');return p[2]+'/'+p[1]}
+function fmtKg(kg){return (Math.round(kg*10)/10).toFixed(1).replace('.',',')+' kg'}
+function saveWeight(kind,kg,aprox){var k=todayKey();if(!S.weights[k])S.weights[k]={};S.weights[k][kind]=kg;S.weights[k][kind+'A']=!!aprox;try{sv('weights',JSON.stringify(S.weights))}catch(e){}}
+function parseKg(str){
+  var t=norm(String(str).replace(/(\d)\s*[,.]\s*(\d)/g,'$1p$2')).replace(/(\d)p(\d)/g,'$1.$2');
+  var m=t.match(/(\d+(?:\.\d+)?)/),val=null;
+  if(m){val=parseFloat(m[1]);var m2=t.slice(m.index+m[0].length).match(/^\s*(?:kilos?|kg)?\s*(?:y\s*)?(\d{3})\s*(?:gramos|gr|g)\b/);if(m2)val+=(+m2[1])/1000;else{var mh=t.slice(m.index+m[0].length).match(/^\s*(?:kilos?|kg)?\s*(?:y\s*)?(medio)\b/);if(mh)val+=0.5}}
+  else{var tk=t.split(' ').filter(function(w){return NW[w]!==undefined});if(tk.length)val=wordsToNum(tk)}
+  if(val==null||!isFinite(val))return null;
+  return (val>=30&&val<=250)?Math.round(val*10)/10:null;
+}
+function weightDays(){return Object.keys(S.weights).sort().reverse()}
 function logText(){
+  if(!S.log.length&&!weightDays().length)return 'Sin registros todavía.';
+  var out=S.log.slice().reverse().map(function(e){
+    return dstr(e.id)+' | Infusión indicada: '+(e.plan?fmtL(e.plan):'sin dato')+' | Sacó: '+fmtL(e.out)+' ('+e.out+' mL)'+(e.plan?' | Balance: '+(e.out-e.plan>=0?'+':'')+(e.out-e.plan)+' mL':'')+(e.asp?' | Líquido: '+ASP[e.asp]:'')+(e.done?'':' | (cambio sin terminar)');
+  });
+  var wd=weightDays();
+  if(wd.length){out.push('');out.push('PESO:');wd.forEach(function(k){var w=S.weights[k];out.push(dayLabel(k)+' | antes: '+(w.antes!=null?fmtKg(w.antes):'-')+' | después: '+(w.despues!=null?fmtKg(w.despues):'-')+((w.antes!=null&&w.despues!=null)?' | diferencia: '+((w.despues-w.antes)>=0?'+':'')+(Math.round((w.despues-w.antes)*10)/10).toString().replace('.',',')+' kg':''))})}
+  return out.join('\n');
+}
+function logTextOld(){
   if(!S.log.length)return 'Sin registros todavía.';
   return S.log.slice().reverse().map(function(e){
     return dstr(e.id)+' | Infusión indicada: '+(e.plan?fmtL(e.plan):'sin dato')+' | Sacó: '+fmtL(e.out)+' ('+e.out+' mL)'+(e.plan?' | Balance: '+(e.out-e.plan>=0?'+':'')+(e.out-e.plan)+' mL':'')+(e.asp?' | Líquido: '+ASP[e.asp]:'')+(e.done?'':' | (cambio sin terminar)');
@@ -903,21 +998,27 @@ function confirmDrain(){
   say(t);
 }
 function vLog(){
-  var rows=S.log.slice().reverse().map(function(e){
+  var exRows=S.log.slice().reverse().map(function(e){
     var bal=e.plan?e.out-e.plan:null;
-    return '<div class="logrow"><b>'+dstr(e.id)+'</b><span>Infusión indicada: '+(e.plan?fmtL(e.plan):'sin dato')+'</span><span>Sacó: <b>'+fmtL(e.out)+'</b> ('+e.out+' mL)</span>'
-     +(bal!=null?'<span>Balance: '+(bal>=0?'+':'')+bal+' mL</span>':'')
-     +(e.asp?'<span>Líquido: '+ASP[e.asp]+'</span>':'')+(e.done?'':'<span class="note">Cambio sin terminar</span>')+'</div>';
+    return '<tr><td>'+dstr(e.id)+'</td><td>'+(e.plan?fmtL(e.plan):'—')+'</td><td><b>'+fmtL(e.out)+'</b></td><td>'+(bal!=null?((bal>=0?'+':'')+bal):'—')+'</td><td>'+(e.asp?ASP[e.asp]:'—')+(e.done?'':' *')+'</td></tr>';
+  }).join('');
+  var wd=weightDays();
+  var wRows=wd.map(function(k){var w=S.weights[k];var dif=(w.antes!=null&&w.despues!=null)?(Math.round((w.despues-w.antes)*10)/10):null;
+    return '<tr><td>'+dayLabel(k)+'</td><td>'+(w.antes!=null?fmtKg(w.antes)+(w.antesA?' ~':''):'—')+'</td><td>'+(w.despues!=null?fmtKg(w.despues)+(w.despuesA?' ~':''):'—')+'</td><td>'+(dif!=null?((dif>=0?'+':'')+(''+dif).replace('.',',')+' kg'):'—')+'</td></tr>';
   }).join('');
   var today=new Date().toDateString(),ti=0,to=0,tn=0;
   S.log.forEach(function(e){if(new Date(e.id).toDateString()===today&&e.done&&e.plan){ti+=e.plan;to+=e.out;tn++}});
-  return '<header class="top"><div class="toprow"><span>Mi registro</span></div></header><main style="padding-block:16px 40px"><div class="stack">'
-   +'<button class="btn" data-act="home">Volver al inicio</button>'
-   +(tn?'<div class="box"><p class="num" style="margin:0">Hoy ('+tn+' '+(tn===1?'cambio':'cambios')+')</p><p style="margin:4px 0 0;font-weight:700">Infundió '+fmtL(ti)+' · Sacó '+fmtL(to)+'</p><p style="margin:4px 0 0">Balance del día: <b>'+(to-ti>=0?'+':'')+(to-ti)+' mL</b></p></div>':'')
-   +(rows||'<p class="sub">Todavía no hay registros. Se anotan solos cuando usted dice cuánto líquido sacó.</p>')
-   +(S.log.length?'<button class="btn" data-act="logcopy">Copiar para mandar a mi enfermera o enfermero</button><textarea id="logtxt" readonly>'+esc(logText())+'</textarea><p class="note" id="copymsg" aria-live="polite"></p>'
-     +'<button class="btn '+(S.logConfirm?'danger':'soft')+'" data-act="logclear">'+(S.logConfirm?'Sí, borrar todo el registro':'Borrar el registro')+'</button>':'')
-   +'<p class="note">El registro queda guardado solo en este teléfono. Si borra los datos del navegador, se pierde.</p></div></main>';
+  var o='<header class="top"><div class="toprow"><span>Mi registro</span></div></header><main style="padding-block:16px 40px"><div class="stack">'
+   +'<button class="btn" data-act="'+(S.convo?'closephones':'home')+'">'+IC.prev+'Volver</button>'
+   +'<button class="btn soft" data-act="weighnow">⚖️ Anotar mi peso ahora</button>'
+   +(tn?'<div class="box"><p class="num" style="margin:0">Hoy ('+tn+' '+(tn===1?'cambio':'cambios')+')</p><p style="margin:4px 0 0;font-weight:700">Infundió '+fmtL(ti)+' · Sacó '+fmtL(to)+'</p><p style="margin:4px 0 0">Balance del día: <b>'+(to-ti>=0?'+':'')+(to-ti)+' mL</b></p></div>':'');
+  if(exRows){o+='<p class="phase">Cambios</p><div class="tablewrap"><table class="rtab"><thead><tr><th>Fecha</th><th>Infusión</th><th>Sacó</th><th>Balance mL</th><th>Líquido</th></tr></thead><tbody>'+exRows+'</tbody></table></div>';}
+  if(wRows){o+='<p class="phase">Peso (kg) · ~ es aproximado</p><div class="tablewrap"><table class="rtab"><thead><tr><th>Fecha</th><th>Antes</th><th>Después</th><th>Diferencia</th></tr></thead><tbody>'+wRows+'</tbody></table></div>';}
+  if(!exRows&&!wRows)o+='<p class="sub">Todavía no hay registros. Se anotan solos cuando, en manos libres, usted dice cuánto líquido sacó o su peso.</p>';
+  if(S.log.length||wd.length)o+='<button class="btn" data-act="logcopy">Copiar para mandar a mi enfermera o enfermero</button><textarea id="logtxt" readonly>'+esc(logText())+'</textarea><p class="note" id="copymsg" aria-live="polite"></p>'
+     +'<button class="btn '+(S.logConfirm?'danger':'soft')+'" data-act="logclear">'+(S.logConfirm?'Sí, borrar todo el registro':'Borrar el registro')+'</button>';
+  o+='<p class="note">El registro queda guardado solo en este teléfono. Si borra los datos del navegador, se pierde.</p></div></main>';
+  return o;
 }
 
 /* ---------- nombre ---------- */
@@ -965,7 +1066,7 @@ function pickNick(n){
 function render(){
   document.documentElement.style.setProperty('--fs',S.fs);
   var h;
-  if(S.view==='name')h=vName();else if(S.view==='home')h=vHome();else if(S.view==='vol')h=vVol();else if(S.view==='log')h=vLog();else if(S.view==='phones')h=vPhones();else if(S.view==='index')h=vIndex();else if(S.view==='done')h=vDone();else h=vStep();
+  if(S.view==='name')h=vName();else if(S.view==='home')h=vHome();else if(S.view==='vol')h=vVol();else if(S.view==='log')h=vLog();else if(S.view==='phones')h=vPhones();else if(S.view==='weigh')h=vWeigh();else if(S.view==='index')h=vIndex();else if(S.view==='done')h=vDone();else h=vStep();
   if(S.help)h+=vHelp();
   if(S.ask){h+=vAsk()}
   app.innerHTML=h;
@@ -1018,11 +1119,14 @@ app.addEventListener('click',function(e){
     case 'phones':if(S.convo){openPhones(false)}else{stopSay();S.prevView='home';S.view='phones';render();window.scrollTo(0,0)}break;
     case 'closephones':S.view=(S.prevView==='step'?'step':'home');render();window.scrollTo(0,0);if(S.convo)convoStep();break;
     case 'log':stopSay();S.view='log';S.logConfirm=false;render();window.scrollTo(0,0);break;
+    case 'weighnow':S.werr='';S.view='weigh';render();window.scrollTo(0,0);break;
+    case 'wsaveA':saveWeighFromInput('antes');break;
+    case 'wsaveD':saveWeighFromInput('despues');break;
     case 'logcopy':
       var tx=document.getElementById('logtxt'),cm=document.getElementById('copymsg');
       try{navigator.clipboard.writeText(tx.value).then(function(){if(cm)cm.textContent='Copiado. Péguelo en un mensaje.'},function(){tx.select();if(cm)cm.textContent='Seleccionado. Use Copiar de su teléfono.'})}catch(err){tx.select();if(cm)cm.textContent='Seleccionado. Use Copiar de su teléfono.'}
       break;
-    case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];logSave();S.logConfirm=false;render()}break;
+    case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];S.weights={};try{sv('weights','{}')}catch(e){}logSave();S.logConfirm=false;render()}break;
     case 'resume':go(S.saved,'main');break;
     case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
@@ -1074,7 +1178,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowRight')app.querySelector('[data-act=next]').click();
   if(e.key==='ArrowLeft')app.querySelector('[data-act=prev]').click();
 });
-app.addEventListener('keydown',function(e){if(e.key!=='Enter')return;var id=e.target.id;if(id==='nq'){e.preventDefault();submitName(e.target.value)}else if(id==='nq2'){e.preventDefault();pickNick(e.target.value)}else if(id==='q'){e.preventDefault();askQ(e.target.value)}else if(id==='dq'){e.preventDefault();submitDrain(e.target.value)}else if(id==='vq'){e.preventDefault();submitVol(e.target.value)}});
+app.addEventListener('keydown',function(e){if(e.key!=='Enter')return;var id=e.target.id;if(id==='nq'){e.preventDefault();submitName(e.target.value)}else if(id==='nq2'){e.preventDefault();pickNick(e.target.value)}else if(id==='q'){e.preventDefault();askQ(e.target.value)}else if(id==='dq'){e.preventDefault();submitDrain(e.target.value)}else if(id==='vq'){e.preventDefault();submitVol(e.target.value)}else if(id==='wq'){e.preventDefault();saveWeighFromInput('antes')}});
 initCaps();
 render();
 </script>
