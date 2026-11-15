@@ -535,8 +535,8 @@ function hookDict(d){
 }
 /* ---------- modo conversacion (manos libres) ---------- */
 function sayThen(t,cb){
-  t=speakable(t);S.speaking=true;S.sayingNorm=norm(t);try{if(S.convo&&CAP.d&&CAP.d.stop)CAP.d.stop()}catch(e){}try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
-  var done=false;function fin(){if(done)return;done=true;S.speaking=false;S.sayingNorm='';try{cb&&cb()}catch(e){}}
+  t=speakable(t);S.speaking=true;S.sayingNorm=norm(t);S.lastSpokeNorm=S.sayingNorm;try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
+  var done=false;function fin(){if(done)return;done=true;S.speaking=false;S.sayingNorm='';S.lastSpokeAt=Date.now();try{cb&&cb()}catch(e){}}
   if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
 }
@@ -587,7 +587,7 @@ function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();r
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
 var WASHGAP=9000;
 function convoStep(){
-  if(!S.convo)return;S.convoAskedAt=0;
+  if(!S.convo)return;S.convoAskedAt=0;convoListen();
   if(S.flow==='wash'){convoWashRead();return}
   if(S.flow==='main'&&S.i===1&&!S.washKnown){
     S.washAsk=true;
@@ -616,12 +616,13 @@ function convoWashRead(){
   });
 }
 function convoListen(){if(!S.convo||!CAP.d)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
+function isEcho(n){if(!n)return false;if(S.speaking&&(S.sayingNorm||'').indexOf(n)>=0)return true;if(S.lastSpokeNorm&&(Date.now()-(S.lastSpokeAt||0))<1800&&S.lastSpokeNorm.indexOf(n)>=0)return true;return false;}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
-  if(SAFE.test(n)&&!(S.speaking&&(S.sayingNorm||'').indexOf(n)>=0)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(/turbio|opaco|lechoso|nublado|sangre|sangr|rojo|rosad|colorad|coagul|fibrin|pus\b/.test(n)?urgentText():safeText());return}
+  if(SAFE.test(n)&&!isEcho(n)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(/turbio|opaco|lechoso|nublado|sangre|sangr|rojo|rosad|colorad|coagul|fibrin|pus\b/.test(n)?urgentText():safeText());return}
   if(S.speaking){
     var ecoTxt=(S.sayingNorm||'');
-    if((isStop(n)||isPause(n)||isBack(n)||isRepeat(n))&&(n&&ecoTxt.indexOf(n)<0)){stopSay()}
+    if((isStop(n)||isPause(n)||isBack(n)||isRepeat(n))&&!isEcho(n)){stopSay()}
     else return;
   }
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
@@ -659,6 +660,7 @@ function convoHeard(text){
     return;
   }
   if(S.aspAsk){
+    if(isEcho(n))return;
     if(isBack(n)){S.aspAsk=false;if(S.i>0){S.i--;render()}convoStep();return}
     var asp=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)/.test(n)?'s':(/\b(turbio|opaco|lechoso|blanco|nublado|sucio)\b/.test(n)?'t':(/\b(transparent|limpio|claro|normal|cristalin|sin color)/.test(n)?'c':''));
     if(!asp){sayThen('No entendí. ¿Cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});return}
@@ -720,7 +722,7 @@ function convoOnRecEnd(){
   if(!S.convo)return;
   if(S.heard)S.heard=false;                 /* ya se procesó algo: NO frenar el reinicio del micrófono */
   if(S.flow==='wash'){convoListen();return}
-  if(S.speaking)return;                       /* mientras habla el mic está apagado (evita el eco) */
+  if(S.speaking){convoListen();return}       /* mantené el mic vivo mientras lee */
   if(S.flow==='main'&&STEPS[S.i]&&STEPS[S.i].wait){convoListen();return}  /* espera larga (drenaje/infusión): sin '¿Seguimos?' */
   var now=Date.now();
   if(!S.convoAskedAt){S.convoAskedAt=now;convoListen();return}  /* recién terminó de leer: arranca el reloj */
