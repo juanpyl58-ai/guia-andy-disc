@@ -154,10 +154,10 @@ var STEPS=[
  {t:'Armar el sistema',d:'Cuelgue la bolsa y haga la prueba de hermeticidad, como le enseñaron. Coloque el organizador en el soporte. Y coloque el tapón.'},
  {t:'Preparar la conexión',d:'Póngase alcohol gel y frótese las manos hasta que se seque. Despegue las guías. Primero coloque el tapón en el organizador. Después, coloque el catéter en el organizador. Y vuelva a ponerse alcohol gel en las manos.',k:'hig',tag:'Higiene'},
  {t:'Conexión',d:'Póngase alcohol gel en las manos y frótelas hasta que sequen. Desenrosque el tapón del centro del sistema: amarillo si la bolsa es amarilla, verde si la bolsa es verde. Desenrosque el tapón de su catéter. Y enrosque su catéter en el centro.',k:'key',tag:'Momento clave'},
- {t:'Drenaje',d:'Abra la pinza en el punto que muestra el dibujo. Deje que el líquido salga a la bolsa de drenaje. Suele tardar unos diez a doce minutos, hasta que no salga más. Cuando no salga más líquido, dígame listo, o toque Siguiente.',k:'key',tag:'Momento clave',wait:1,disc:{k:'one',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f'],lab:'',say:'un punto'},hint:'La punta azul señala el punto solo, arriba a la izquierda.'},
+ {t:'Drenaje',d:'Abra la pinza en el punto que muestra el dibujo. Deje que el líquido salga a la bolsa de drenaje. Suele tardar unos diez a doce minutos, hasta que no salga más. Cuando no salga más líquido, dígame listo.',k:'key',tag:'Momento clave',wait:1,disc:{k:'one',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f'],lab:'',say:'un punto'},hint:'La punta azul señala el punto solo, arriba a la izquierda.'},
  {t:'Pesar la bolsa y registrar',d:'Pese la bolsa. Mire cómo es el líquido (color y aspecto) y anótelo en su registro.'},
  {t:'Lavar el sistema',d:'Gire el disco hasta los dos puntos, donde dice LAVE. Cuente hasta 5.',disc:{k:'lave',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f','f'],lab:'LAVE',say:'dos puntos, lave'},count:1,hint:'La punta azul señala los dos puntos, arriba a la derecha.'},
- {t:'Infusión',d:'Gire el disco hasta el medio pintado, en el grupo de tres símbolos abajo a la derecha. Es la posición de mitad abierto. Deje que entre el líquido; tarda unos minutos. Cuando termine de entrar, dígame listo, o toque Siguiente.',k:'key',tag:'Momento clave',wait:1,disc:{k:'inf',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['o','h','f'],lab:'INFUSIÓN',say:'el medio pintado, mitad abierto, infusión',legend:1},hint:'La punta azul va al medio pintado (mitad abierto), abajo a la derecha.'},
+ {t:'Infusión',d:'Gire el disco hasta el medio pintado, en el grupo de tres símbolos abajo a la derecha. Es la posición de mitad abierto. Deje que entre el líquido; tarda unos minutos. Cuando ya entró todo, dígame listo.',k:'key',tag:'Momento clave',wait:1,disc:{k:'inf',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['o','h','f'],lab:'INFUSIÓN',say:'el medio pintado, mitad abierto, infusión',legend:1},hint:'La punta azul va al medio pintado (mitad abierto), abajo a la derecha.'},
  {t:'Girar el disco a los cuatro puntos',d:'Gire el disco hasta los cuatro puntos.',disc:{k:'four',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f','f','f','f'],lab:'',say:'cuatro puntos'},hint:'La punta azul señala los cuatro puntos, a la izquierda.'},
  {t:'Cerrar la pinza del extensor',d:'Cierre la pinza del extensor.'},
  {t:'Desconexión',d:'Póngase alcohol gel en las manos y frótelas hasta que sequen. Este paso es muy importante, hágalo con cuidado. Primero, asegúrese de haber cerrado la pinza, el clamp. Después, desenrosque el tapón de la izquierda. A continuación, desconecte del centro su catéter, con el testigo azul. Y enrósquelo en su tapón nuevo.',k:'key',tag:'Momento clave'}
@@ -616,7 +616,7 @@ function convoWashRead(){
   });
 }
 function convoListen(){if(!S.convo||!CAP.d)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
-function isEcho(n){if(!n)return false;if(S.speaking&&(S.sayingNorm||'').indexOf(n)>=0)return true;if(S.lastSpokeNorm&&(Date.now()-(S.lastSpokeAt||0))<1800&&S.lastSpokeNorm.indexOf(n)>=0)return true;return false;}
+function isEcho(n){if(!n)return false;var re;try{re=new RegExp('\\b'+n+'\\b')}catch(e){return false}if(S.speaking&&re.test(S.sayingNorm||''))return true;if(S.lastSpokeNorm&&(Date.now()-(S.lastSpokeAt||0))<1800&&re.test(S.lastSpokeNorm))return true;return false;}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
   if(SAFE.test(n)&&!isEcho(n)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(/turbio|opaco|lechoso|nublado|sangre|sangr|rojo|rosad|colorad|coagul|fibrin|pus\b/.test(n)?urgentText():safeText());return}
@@ -660,14 +660,15 @@ function convoHeard(text){
     return;
   }
   if(S.aspAsk){
-    if(isEcho(n))return;
     if(isBack(n)){S.aspAsk=false;if(S.i>0){S.i--;render()}convoStep();return}
-    var asp=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)/.test(n)?'s':(/\b(turbio|opaco|lechoso|blanco|nublado|sucio)\b/.test(n)?'t':(/\b(transparent|limpio|claro|normal|cristalin|sin color)/.test(n)?'c':''));
+    var hS=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)/.test(n),hT=/\b(turbio|opaco|lechoso|blanco|nublado|sucio)/.test(n),hC=/\b(transparent|limpio|claro|normal|cristalin|sin color)/.test(n);
+    if((hS?1:0)+(hT?1:0)+(hC?1:0)>=2){if(S.convo)convoListen();return}   /* eco: la pregunta nombra las TRES opciones; la respuesta real es UNA sola */
+    var asp=hS?'s':(hT?'t':(hC?'c':''));
     if(!asp){sayThen('No entendí. ¿Cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});return}
     S.aspAsk=false;if(S.rec){S.rec.asp=asp;recSave()}
     if(asp==='c'){sayThen('Transparente, muy bien. ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});return}
     convoStop();S.view='phones';render();window.scrollTo(0,0);
-    say('El líquido salió '+(asp==='t'?'turbio':'con sangre')+'. Esto es importante. Llame urgente a su enfermera y a su doctora. Acá tiene los teléfonos para llamar.');
+    say(urgentText());
     return;
   }
   var jj=jumpIntent(n);
@@ -678,6 +679,7 @@ function convoHeard(text){
     if(/\b(no|ya se|ya s[eé]|lo se|lo s[eé]|se lavar|siguiente|sigamos|segu|continu|salt|omit)\b/.test(n)){S.washKnown=true;sv('washknown','1');convoNext();return}
     S.back=S.i;S.washPaused=false;go(0,'wash');convoStep();return;
   }
+  if((S.flow==='wash'||(S.flow==='main'&&STEPS[S.i]&&STEPS[S.i].wait))&&isEcho(n)){if(S.convo)convoListen();return}  /* no avanzar por el eco de '...dígame listo' */
   if(isPhonesIntent(n)){S.convoAskedAt=Date.now();openPhones(true);return}
   if(S.flow==='wash'){
     if(isPause(n)){S.washPaused=true;render();sayThen('En pausa'+nn()+'. Diga sigamos cuando quiera seguir.',function(){if(S.convo)convoListen()});return}
@@ -829,7 +831,7 @@ function initCaps(){
   }catch(e){}
   ensureBrowserDict();
 }
-var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangr|pierde|perdio|perdiendo|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota|coagul|fibrin|escalofri|\bno\b(?: \w+){0,3} dren/;
+var SAFE=/contamin|equivoc|me toque|toque algo|toque el|cayo|se cayo|me cai|sucio|dolor|fiebre|turbio|sangr|pierde|perdio|perdiendo|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota|coagul|fibrin|escalofri|\bno\b(?: \w+){0,3} dren/;
 var STOPW='que cual como donde cuando para con por una uno los las del esta este eso esa estoy tengo hago debo puedo hay mas muy pero sobre algo cosa paso pasos'.split(' ');
 function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o su doctora. Llame a su enfermera'+(S.phone?' al '+S.phone:'')+' o a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'. Toque el botón verde para llamar.'}
 function urgentText(){return (S.nick?S.nick+', ':'')+'el líquido no está bien. Esto es importante. Llame urgente a su enfermera'+(S.phone?' al '+S.phone:'')+' y a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'. Toque el botón verde para llamar.'}
@@ -1150,7 +1152,7 @@ app.addEventListener('click',function(e){
       var tx=document.getElementById('logtxt'),cm=document.getElementById('copymsg');
       try{navigator.clipboard.writeText(tx.value).then(function(){if(cm)cm.textContent='Copiado. Péguelo en un mensaje.'},function(){tx.select();if(cm)cm.textContent='Seleccionado. Use Copiar de su teléfono.'})}catch(err){tx.select();if(cm)cm.textContent='Seleccionado. Use Copiar de su teléfono.'}
       break;
-    case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];S.weights={};try{sv('weights','{}')}catch(e){}logSave();S.logConfirm=false;render()}break;
+    case 'logclear':if(!S.logConfirm){S.logConfirm=true;render()}else{S.log=[];logSave();S.logConfirm=false;render()}break;
     case 'resume':go(S.saved,'main');break;
     case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
