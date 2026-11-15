@@ -717,11 +717,14 @@ function convoAnswer(q){
   claudeAnswer(q).then(then).catch(function(){then(loc)});
 }
 function convoOnRecEnd(){
-  if(!S.convo||S.heard)return;
+  if(!S.convo)return;
+  if(S.heard)S.heard=false;                 /* ya se procesó algo: NO frenar el reinicio del micrófono */
   if(S.flow==='wash'){convoListen();return}
+  if(S.speaking){convoListen();return}       /* todavía está leyendo: mantené el mic vivo (barge-in) */
   var now=Date.now();
-  if(now-S.convoAskedAt>22000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo)convoListen()})}
-  else convoListen();
+  if(!S.convoAskedAt){S.convoAskedAt=now;convoListen();return}  /* recién terminó de leer: arranca el reloj */
+  if(now-S.convoAskedAt>22000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo){S.convoAskedAt=Date.now();convoListen()}});return}
+  convoListen();
 }
 /* ---------- lavado de manos fluido (sin voz: por tiempo) ---------- */
 function washPlay(){
