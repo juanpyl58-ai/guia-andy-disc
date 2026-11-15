@@ -154,10 +154,10 @@ var STEPS=[
  {t:'Armar el sistema',d:'Cuelgue la bolsa y haga la prueba de hermeticidad, como le enseñaron. Coloque el organizador en el soporte. Y coloque el tapón.'},
  {t:'Preparar la conexión',d:'Póngase alcohol gel y frótese las manos hasta que se seque. Despegue las guías. Coloque el catéter en el organizador. Y vuelva a ponerse alcohol gel en las manos.',k:'hig',tag:'Higiene'},
  {t:'Conexión',d:'Póngase alcohol gel en las manos y frótelas hasta que sequen. Desenrosque el tapón del centro del sistema: amarillo si la bolsa es amarilla, verde si la bolsa es verde. Desenrosque el tapón de su catéter. Y enrosque su catéter en el centro.',k:'key',tag:'Momento clave'},
- {t:'Drenaje',d:'Abra la pinza en el punto que muestra el dibujo. Deje que el líquido salga a la bolsa de drenaje, el tiempo que le indicó su enfermera o enfermero.',k:'key',tag:'Momento clave',disc:{k:'one',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f'],lab:'',say:'un punto'},hint:'La punta azul señala el punto solo, arriba a la izquierda.'},
+ {t:'Drenaje',d:'Abra la pinza en el punto que muestra el dibujo. Deje que el líquido salga a la bolsa de drenaje. Suele tardar unos diez a doce minutos, hasta que no salga más. Cuando no salga más líquido, dígame listo, o toque Siguiente.',k:'key',tag:'Momento clave',wait:1,disc:{k:'one',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f'],lab:'',say:'un punto'},hint:'La punta azul señala el punto solo, arriba a la izquierda.'},
  {t:'Pesar la bolsa y registrar',d:'Pese la bolsa. Mire cómo es el líquido (color y aspecto) y anótelo en su registro.'},
  {t:'Lavar el sistema',d:'Gire el disco hasta los dos puntos, donde dice LAVE. Cuente hasta 5.',disc:{k:'lave',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f','f'],lab:'LAVE',say:'dos puntos, lave'},count:1,hint:'La punta azul señala los dos puntos, arriba a la derecha.'},
- {t:'Infusión',d:'Gire el disco hasta el medio pintado, en el grupo de tres símbolos abajo a la derecha. Es la posición de mitad abierto.',k:'key',tag:'Momento clave',disc:{k:'inf',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['o','h','f'],lab:'INFUSIÓN',say:'el medio pintado, mitad abierto, infusión',legend:1},hint:'La punta azul va al medio pintado (mitad abierto), abajo a la derecha.'},
+ {t:'Infusión',d:'Gire el disco hasta el medio pintado, en el grupo de tres símbolos abajo a la derecha. Es la posición de mitad abierto. Deje que entre el líquido; tarda unos minutos. Cuando termine de entrar, dígame listo, o toque Siguiente.',k:'key',tag:'Momento clave',wait:1,disc:{k:'inf',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['o','h','f'],lab:'INFUSIÓN',say:'el medio pintado, mitad abierto, infusión',legend:1},hint:'La punta azul va al medio pintado (mitad abierto), abajo a la derecha.'},
  {t:'Girar el disco a los cuatro puntos',d:'Gire el disco hasta los cuatro puntos.',disc:{k:'four',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f','f','f','f'],lab:'',say:'cuatro puntos'},hint:'La punta azul señala los cuatro puntos, a la izquierda.'},
  {t:'Cerrar la pinza del extensor',d:'Cierre la pinza del extensor.'},
  {t:'Desconexión',d:'Póngase alcohol gel en las manos, igual que en la conexión. Desenrosque el tapón. Desconéctese del centro, con el testigo azul, el PIN. Y enrosque su catéter en el tapón nuevo.',k:'key',tag:'Momento clave'}
@@ -468,7 +468,7 @@ function discReal(k){return '<div class="artbox"><div class="rd"><img src="'+PH[
 /* ---------- preguntas ---------- */
 var CAP={d:null,s:null,t:null};
 S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
-S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
+S.vol=+ld('vol',1500);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
 S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
 S.volAsk=false;S.werr='';S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;S.volInAsk=false;S.aspAsk=false;
 S.nick=ld('nick','');S.nm='';S.nerr='';
@@ -535,7 +535,7 @@ function hookDict(d){
 }
 /* ---------- modo conversacion (manos libres) ---------- */
 function sayThen(t,cb){
-  t=speakable(t);S.speaking=true;S.sayingNorm=norm(t);try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
+  t=speakable(t);S.speaking=true;S.sayingNorm=norm(t);try{if(S.convo&&CAP.d&&CAP.d.stop)CAP.d.stop()}catch(e){}try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
   var done=false;function fin(){if(done)return;done=true;S.speaking=false;S.sayingNorm='';try{cb&&cb()}catch(e){}}
   if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
@@ -576,7 +576,7 @@ function convoBegin(){
 }
 function convoAfterPre(){
   if(!S.convo)return;
-  if(S.volDay!==todayKey()){S.volInAsk=true;sayThen('¿Cuántos litros va a infundir hoy? Es la cantidad que le indicó su médico o su enfermera. Por ejemplo, dos litros.',function(){if(S.convo)convoListen()});return}
+  if(S.volDay!==todayKey()){S.volInAsk=true;sayThen('¿Cuántos litros va a infundir hoy? '+(S.vol?'Lo de siempre es '+fmtL(S.vol)+'. Diga sí para confirmar, o diga otra cantidad.':'Por ejemplo, un litro y medio.'),function(){if(S.convo)convoListen()});return}
   convoStep();
 }
 function convoFinishDone(){
@@ -587,7 +587,7 @@ function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();r
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
 var WASHGAP=9000;
 function convoStep(){
-  if(!S.convo)return;S.convoAskedAt=0;convoListen();
+  if(!S.convo)return;S.convoAskedAt=0;
   if(S.flow==='wash'){convoWashRead();return}
   if(S.flow==='main'&&S.i===1&&!S.washKnown){
     S.washAsk=true;
@@ -638,7 +638,7 @@ function convoHeard(text){
   }
   if(S.volInAsk){
     var vin=parseVol(text);
-    if(vin==null&&S.vol&&/\b(no se|no lo se|igual|lo mismo|como siempre|como la ultima|lo de siempre|los de siempre)\b/.test(n))vin=S.vol;
+    if(vin==null&&S.vol&&(isAdv(n)||/\b(no se|no lo se|igual|lo mismo|como siempre|como la ultima|lo de siempre|los de siempre)\b/.test(n)))vin=S.vol;
     if(vin!=null){S.vol=vin;sv('vol',vin);S.volInAsk=false;S.volDay=todayKey();sv('volday',S.volDay);sayThen('Anoté '+fmtL(vin)+' para infundir hoy.',function(){if(S.convo)convoStep()});return}
     sayThen('No entendí cuántos litros va a infundir. Dígalo, por ejemplo, dos litros, o un litro y medio.',function(){if(S.convo)convoListen()});return;
   }
@@ -720,7 +720,8 @@ function convoOnRecEnd(){
   if(!S.convo)return;
   if(S.heard)S.heard=false;                 /* ya se procesó algo: NO frenar el reinicio del micrófono */
   if(S.flow==='wash'){convoListen();return}
-  if(S.speaking){convoListen();return}       /* todavía está leyendo: mantené el mic vivo (barge-in) */
+  if(S.speaking)return;                       /* mientras habla el mic está apagado (evita el eco) */
+  if(S.flow==='main'&&STEPS[S.i]&&STEPS[S.i].wait){convoListen();return}  /* espera larga (drenaje/infusión): sin '¿Seguimos?' */
   var now=Date.now();
   if(!S.convoAskedAt){S.convoAskedAt=now;convoListen();return}  /* recién terminó de leer: arranca el reloj */
   if(now-S.convoAskedAt>22000){S.convoAskedAt=now;sayThen('¿Seguimos? Diga sí para continuar.',function(){if(S.convo){S.convoAskedAt=Date.now();convoListen()}});return}
