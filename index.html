@@ -171,7 +171,7 @@ var WASH=['Sáquese los anillos y las pulseras. Abra la canilla y regule el agua
 function ld(k,d){try{var v=localStorage.getItem('andy.'+k);return v===null?d:v}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem('andy.'+k,v)}catch(e){}}
 var S={view:'home',flow:'main',i:0,help:false,confirm:false,
-  fs:+ld('fs',36),voice:ld('voice','1')==='1',phone:ld('phone',''),phoneDoc:ld('phonedoc',''),volDay:ld('volday',''),saved:+ld('i',0),back:0};
+  fs:+ld('fs',36),voice:ld('voice','1')==='1',phone:ld('phone',''),phoneDoc:ld('phonedoc','+54 9 2994 69-2609'),volDay:ld('volday',''),saved:+ld('i',0),back:0};
 var app=document.getElementById('app'),live=document.getElementById('live');
 var timer=null;
 
@@ -296,7 +296,7 @@ function vStep(){
     if(S.i===8)m+=connBox('infuse');
     if(S.i===5)m+=reminderBox();
     if(S.i===6)m+=reminderBox()+recPanel();
-    if(S.i===8&&S.vol)m+='<p class="okbox">Infunda '+fmtL(S.vol)+'.</p>';
+    if(S.i===8&&volToday())m+='<p class="okbox">Infunda '+fmtL(volToday())+'.</p>';
     if(p.count)m+='<div class="box stack"><div class="count" id="cnt" aria-live="polite">&nbsp;</div><button class="btn" data-act="count">Contar conmigo hasta 5</button></div>';
     if(p.wash){
       if(S.washKnown){m+='<button class="btn soft" data-act="openwash">Ver cómo lavarse las manos</button>';}
@@ -351,7 +351,7 @@ function vIndex(){
 }
 function vDone(){
   var r=S.rec,sum='';
-  if(r&&r.drained!=null)sum='<div class="box stack" style="text-align:left;width:100%"><p class="num" style="margin:0">Este cambio</p><p style="margin:0">Infundió: <b>'+(S.vol?fmtL(S.vol):'sin dato')+'</b></p><p style="margin:0">Sacó: <b>'+fmtL(r.drained)+'</b>'+(S.vol?' ('+diffText(r.drained,S.vol)+')':'')+'</p>'+(r.asp?'<p style="margin:0">Líquido: <b>'+ASP[r.asp]+'</b></p>':'')+'</div>';
+  if(r&&r.drained!=null)sum='<div class="box stack" style="text-align:left;width:100%"><p class="num" style="margin:0">Este cambio</p><p style="margin:0">Infundió: <b>'+(volToday()?fmtL(volToday()):'sin dato')+'</b></p><p style="margin:0">Sacó: <b>'+fmtL(r.drained)+'</b>'+(volToday()?' ('+diffText(r.drained,volToday())+')':'')+'</p>'+(r.asp?'<p style="margin:0">Líquido: <b>'+ASP[r.asp]+'</b></p>':'')+'</div>';
   return '<main class="done"><h1 class="title-big">Terminó el procedimiento</h1><p class="detail">Muy bien'+nn()+'. Gracias por hacerlo con tanto cuidado.</p>'+sum
    +'<button class="btn" data-act="log">Ver mi registro</button><button class="btn primary" data-act="home">Volver al inicio</button></main>';
 }
@@ -546,10 +546,10 @@ function isWait(n){return /\b(todavia|todav[ií]a|espera|esper[aá]|esperame|esp
 function isAdv(n){
   n=n.trim();if(isWait(n))return false;
   if(/^(si+|s[ií]|sip|sii+|si si|sisi|ya|ya esta|ya esta hecho|ya lo hice|lo hice|ya hice|ya termine|termine|dale|ok|okey|okay|oka|bueno|aja|ajá|obvio|exacto|correcto|listo|joya|genial|vamos|vamo|de una)$/.test(n))return true;
-  return /\b(dale|de una|de once|sigamos|sigo|sig[ao]|segu[ií]|seguime|seguimos|seguir|contin|avanz|pas(a|á|amos|emos)|proxim|el que sigue|lo que sigue|adelante|listo|ya esta|ya lo hice|ya la hice|lo hice|ya hice|ya termine|termine|ya esta hecho|hecho|obvio|tal cual|joya|b[aá]rbaro|genial|vamos|vamo|arranc|metele|ah[ií] va|as[ií] es|perfecto)/.test(n);
+  return /\b(dale|de una|de once|sigamos|sigo|sig[ao]|segu[ií]|seguime|seguimos|seguir|contin|avanz|pas(a|á|amos|emos)|proxim|siguiente|el que sigue|lo que sigue|adelante|listo|ya esta|ya lo hice|ya la hice|lo hice|ya hice|ya termine|termine|ya esta hecho|hecho|obvio|tal cual|joya|b[aá]rbaro|genial|vamos|vamo|arranc|metele|ah[ií] va|as[ií] es|perfecto)/.test(n);
 }
 function isBack(n){return /\b(atras|atr[aá]s|para atras|para atr[aá]s|volver|volv[eé]|volvamos|volvé|anterior|el anterior|el de antes|retroced|retrocede|retrocedé|uno atras|uno atr[aá]s|paso anterior|un paso atras)\b/.test(n)}
-function isRepeat(n){return /\b(repet|repit|de nuevo|devuelta|de vuelta|otra vez|no entiendo|no entend[ií]|no escuche|no escuch[eé]|mas despacio|m[aá]s despacio|no se escucho|no se entiende)\b/.test(n)}
+function isRepeat(n){return /\b(repet|repit|de nuevo|devuelta|de vuelta|otra vez|no entiendo|no entend[ií]|no escuche|no escuch[eé]|mas despacio|m[aá]s despacio|no se escucho|no se entiende)/.test(n)}
 function isStop(n){return /\b(terminar|salir|parar|basta|apaga|apagar|manos libres|detener|silencio|callate|callat[eé]|chau|pará todo)\b/.test(n)}
 /* saltar por voz a una parte: "llevame al drenaje", "ir a la infusion", "al paso 17" */
 function stepByName(n){
@@ -618,7 +618,7 @@ function convoWashRead(){
 function convoListen(){if(!S.convo||!CAP.d)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
-  if(SAFE.test(n)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio|coagul|fibrin/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(safeText());return}
+  if(SAFE.test(n)&&!(S.speaking&&(S.sayingNorm||'').indexOf(n)>=0)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(/turbio|opaco|lechoso|nublado|sangre|sangr|rojo|rosad|colorad|coagul|fibrin|pus\b/.test(n)?urgentText():safeText());return}
   if(S.speaking){
     var ecoTxt=(S.sayingNorm||'');
     if((isStop(n)||isPause(n)||isBack(n)||isRepeat(n))&&(n&&ecoTxt.indexOf(n)<0)){stopSay()}
@@ -650,7 +650,7 @@ function convoHeard(text){
     if(ml!=null){
       S.volAsk=false;convoRecordDrain(ml);
       var t='Anoté '+fmtL(ml)+'.';
-      if(S.vol){t+=ml>=S.vol?' Sacó lo mismo o más de lo que infundió. Muy bien.':' Atención: sacó menos de lo que infundió. Anótelo y avise a su doctora.';}
+      if(volToday()){t+=ml>=volToday()?' Sacó lo mismo o más de lo que infundió. Muy bien.':' Atención: sacó menos de lo que infundió. Anótelo y avise a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'.';}
       S.aspAsk=true;
       sayThen(t+' Ahora, ¿cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});
       return;
@@ -659,7 +659,8 @@ function convoHeard(text){
     return;
   }
   if(S.aspAsk){
-    var asp=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)\b/.test(n)?'s':(/\b(turbio|opaco|lechoso|blanco|nublado|sucio)\b/.test(n)?'t':(/\b(transparent|limpio|claro|normal|cristalin|sin color)\b/.test(n)?'c':''));
+    if(isBack(n)){S.aspAsk=false;if(S.i>0){S.i--;render()}convoStep();return}
+    var asp=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)/.test(n)?'s':(/\b(turbio|opaco|lechoso|blanco|nublado|sucio)\b/.test(n)?'t':(/\b(transparent|limpio|claro|normal|cristalin|sin color)/.test(n)?'c':''));
     if(!asp){sayThen('No entendí. ¿Cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});return}
     S.aspAsk=false;if(S.rec){S.rec.asp=asp;recSave()}
     if(asp==='c'){sayThen('Transparente, muy bien. ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});return}
@@ -822,9 +823,10 @@ function initCaps(){
   }catch(e){}
   ensureBrowserDict();
 }
-var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangre|pierde|perdio|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota|coagul|fibrin|escalofri|no drena|no dren/;
+var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangr|pierde|perdio|perdiendo|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota|coagul|fibrin|escalofri|\bno\b(?: \w+){0,3} dren/;
 var STOPW='que cual como donde cuando para con por una uno los las del esta este eso esa estoy tengo hago debo puedo hay mas muy pero sobre algo cosa paso pasos'.split(' ');
 function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o su doctora. Llame a su enfermera'+(S.phone?' al '+S.phone:'')+' o a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'. Toque el botón verde para llamar.'}
+function urgentText(){return (S.nick?S.nick+', ':'')+'el líquido no está bien. Esto es importante. Llame urgente a su enfermera'+(S.phone?' al '+S.phone:'')+' y a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'. Toque el botón verde para llamar.'}
 function localAnswer(q,n){
   var cur=S.view==='step'&&S.flow==='main'?S.i:(S.back||0);
   if(/\b(telefono|tel[eé]fono|llamar|numero|n[uú]mero)\b/.test(n)){
@@ -904,7 +906,7 @@ var ASP={c:'Transparente',t:'Turbio',s:'Con sangre'};
 function logSave(){sv('log',JSON.stringify(S.log))}
 function recSave(){
   var r=S.rec;if(!r||r.drained==null)return;
-  var e={id:r.id,plan:S.vol,out:r.drained,asp:r.asp||'',done:!!r.done},k=-1;
+  var e={id:r.id,plan:volToday(),out:r.drained,asp:r.asp||'',done:!!r.done},k=-1;
   S.log.forEach(function(x,i){if(x.id===r.id)k=i});
   if(k<0)S.log.push(e);else S.log[k]=e;logSave();
 }
@@ -914,6 +916,7 @@ function diffText(out,plan){
   return d>=0?(d===0?'igual a lo infundido':'+'+d+' mL, de más'):('faltaron '+(-d)+' mL');
 }
 function todayKey(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function volToday(){return S.volDay===todayKey()?(+S.vol||0):0}
 function dayLabel(k){var p=k.split('-');return p[2]+'/'+p[1]}
 function fmtKg(kg){return (Math.round(kg*10)/10).toFixed(1).replace('.',',')+' kg'}
 function saveWeight(kind,kg,aprox){var k=todayKey();if(!S.weights[k])S.weights[k]={};S.weights[k][kind]=kg;S.weights[k][kind+'A']=!!aprox;try{sv('weights',JSON.stringify(S.weights))}catch(e){}}
@@ -967,26 +970,26 @@ function submitVol(txt){
   S.verr='';S.vpend=ml;render();say('¿Son '+spokenVol(ml)+'?');
 }
 function startExchange(ml){
-  S.vol=ml;sv('vol',ml);S.vpend=null;S.verr='';S.volPick=false;S.rec=null;S.dpend=null;S.skip=false;S.nag=false;
+  S.vol=ml;sv('vol',ml);S.volDay=todayKey();sv('volday',S.volDay);S.vpend=null;S.verr='';S.volPick=false;S.rec=null;S.dpend=null;S.skip=false;S.nag=false;
   sv('i',0);S.saved=0;S.back=0;go(0,'main');
 }
 function reminderBox(){
-  return S.vol?'<p class="warnbox">Recuerde: tiene que sacar lo mismo o más de lo que infundió. Infundió '+fmtL(S.vol)+', así que saque '+fmtL(S.vol)+' o más.</p>':'<p class="warnbox">Recuerde: tiene que sacar lo mismo o más de lo que infundió.</p>';
+  var vt=volToday();return vt?'<p class="warnbox">Recuerde: tiene que sacar lo mismo o más de lo que infundió. Infundió '+fmtL(vt)+', así que saque '+fmtL(vt)+' o más.</p>':'<p class="warnbox">Recuerde: tiene que sacar lo mismo o más de lo que infundió.</p>';
 }
 function recPanel(){
   var r=S.rec,o='<div class="box stack"><h2 style="font-size:1.15em">Anote cuánto líquido sacó</h2>';
   if(r&&r.drained!=null){
-    var d=r.drained,ok=!S.vol||d>=S.vol;
+    var d=r.drained,vt=volToday(),ok=!vt||d>=vt;
     o+='<p class="bigv">Sacó '+fmtL(d)+'</p><p class="note" style="margin:0">'+d+' mL anotados</p>';
-    if(S.vol)o+=ok?'<p class="okbox">Infundió '+fmtL(S.vol)+' y sacó '+fmtL(d)+(d===S.vol?': sacó lo mismo. Muy bien.':': sacó más. Muy bien.')+'</p>'
-                  :'<p class="warnbox">Sacó menos de lo que infundió: faltaron '+(S.vol-d)+' mL. Anótelo y avise a su doctora'+(S.phoneDoc?' al '+esc(S.phoneDoc):'')+' antes de infundir de nuevo.</p>';
+    if(vt)o+=ok?'<p class="okbox">Infundió '+fmtL(vt)+' y sacó '+fmtL(d)+(d===vt?': sacó lo mismo. Muy bien.':': sacó más. Muy bien.')+'</p>'
+                  :'<p class="warnbox">Sacó menos de lo que infundió: faltaron '+(vt-d)+' mL. Anótelo y avise a su doctora'+(S.phoneDoc?' al '+esc(S.phoneDoc):'')+' antes de infundir de nuevo.</p>';
     o+='<button class="btn soft" data-act="dfix">Corregir la cantidad</button>';
     o+='<p class="num" style="margin:8px 0 0">Aspecto del líquido</p><div class="chips">'+['c','t','s'].map(function(k){return '<button class="btn" data-act="asp" data-a="'+k+'" style="'+(r.asp===k?'background:var(--accent);color:var(--accent-ink)':'')+'">'+ASP[k]+'</button>'}).join('')+'</div>';
     if(r.asp==='t'||r.asp==='s')o+='<p class="warnbox">Líquido '+ASP[r.asp].toLowerCase()+'. Es importante: llame URGENTE a su enfermera y a su doctora.</p><button class="btn danger" data-act="phones" style="min-height:60px">'+IC.phone+'Ver teléfonos para llamar</button>';
   }else if(S.dpend!=null){
     o+='<p class="bigv">'+fmtL(S.dpend)+'</p><p style="margin:0">¿Sacó esta cantidad?</p><button class="btn primary" data-act="dyes">Sí, anotar '+fmtL(S.dpend)+'</button><button class="btn" data-act="dno">No, corregir</button>';
   }else{
-    o+=(S.vol?'<p class="sub" style="margin:0">Infundió '+fmtL(S.vol)+'. Tiene que sacar lo mismo o más.</p>':'')
+    o+=(volToday()?'<p class="sub" style="margin:0">Infundió '+fmtL(volToday())+'. Tiene que sacar lo mismo o más.</p>':'')
      +'<p class="sub" style="margin:0">Mire el peso de la bolsa y diga cuánto líquido sacó, por ejemplo «un litro y medio» o «1600 mililitros».</p>'
      +'<button class="btn micb" data-act="mic" data-t="dq" '+(CAP.d?'':'hidden')+'>'+IC.mic+'Hablar</button>'
      +'<div class="askrow"><input id="dq" type="text" inputmode="decimal" autocomplete="off" placeholder="Por ejemplo 1,6 litros"><button class="btn primary" data-act="dsend">Anotar</button></div>'
@@ -1006,9 +1009,9 @@ function confirmDrain(){
   if(!S.rec)S.rec={id:Date.now(),drained:null,asp:'',done:false};
   S.rec.drained=ml;recSave();render();
   var t;
-  if(!S.vol)t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+'.';
-  else if(ml>=S.vol)t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+'. Sacó lo mismo o más de lo que infundió. Muy bien.';
-  else t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+', que es menos de lo que infundió. Antes de infundir de nuevo, avise a su enfermera o enfermero.';
+  if(!volToday())t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+'.';
+  else if(ml>=volToday())t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+'. Sacó lo mismo o más de lo que infundió. Muy bien.';
+  else t='Anotado'+nn()+'. Sacó '+spokenVol(ml)+', que es menos de lo que infundió. Anótelo y, antes de infundir de nuevo, avise a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'.';
   say(t);
 }
 function vLog(){
@@ -1129,7 +1132,7 @@ app.addEventListener('click',function(e){
     case 'dyes':confirmDrain();break;
     case 'dno':S.dpend=null;render();break;
     case 'dfix':if(S.rec){S.rec.drained=null;S.dpend=null}render();break;
-    case 'asp':if(S.rec){S.rec.asp=(S.rec.asp===b.dataset.a?'':b.dataset.a);recSave();render();if(S.rec.asp==='t'||S.rec.asp==='s')say('Líquido '+ASP[S.rec.asp].toLowerCase()+'. Avise a su enfermera o enfermero antes de seguir.')}break;
+    case 'asp':if(S.rec){S.rec.asp=(S.rec.asp===b.dataset.a?'':b.dataset.a);recSave();render();if(S.rec.asp==='t'||S.rec.asp==='s')say('Líquido '+ASP[S.rec.asp].toLowerCase()+'. Es importante. Llame urgente a su enfermera y a su doctora. Toque el botón verde para ver los teléfonos.')}break;
     case 'skiprec':S.skip=true;S.nag=false;go(S.i+1,'main');break;
     case 'phones':if(S.convo){openPhones(false)}else{stopSay();S.prevView='home';S.view='phones';render();window.scrollTo(0,0)}break;
     case 'closephones':S.view=(S.prevView==='step'?'step':'home');render();window.scrollTo(0,0);if(S.convo)convoStep();break;
