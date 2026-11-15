@@ -171,7 +171,7 @@ var WASH=['Sáquese los anillos y las pulseras. Abra la canilla y regule el agua
 function ld(k,d){try{var v=localStorage.getItem('andy.'+k);return v===null?d:v}catch(e){return d}}
 function sv(k,v){try{localStorage.setItem('andy.'+k,v)}catch(e){}}
 var S={view:'home',flow:'main',i:0,help:false,confirm:false,
-  fs:+ld('fs',36),voice:ld('voice','1')==='1',phone:ld('phone',''),saved:+ld('i',0),back:0};
+  fs:+ld('fs',36),voice:ld('voice','1')==='1',phone:ld('phone',''),phoneDoc:ld('phonedoc',''),volDay:ld('volday',''),saved:+ld('i',0),back:0};
 var app=document.getElementById('app'),live=document.getElementById('live');
 var timer=null;
 
@@ -370,6 +370,7 @@ function vHelp(){
   o+='<div class="box"><p style="margin:0;font-weight:700">Si no está seguro/a de que algo quedó limpio o bien conectado, deténgase.</p>'
    +'<p class="sub" style="margin-top:8px">No siga hasta consultar a su enfermera o enfermero o a su centro de diálisis.</p></div>'
    +'<label class="field" for="phone">Teléfono de mi enfermera o enfermero<input id="phone" type="tel" inputmode="tel" value="'+S.phone.replace(/"/g,'')+'" placeholder="Escríbalo una sola vez"></label>'
+   +'<label class="field" for="phonedoc">Teléfono de mi doctora o doctor<input id="phonedoc" type="tel" inputmode="tel" value="'+S.phoneDoc.replace(/"/g,'')+'" placeholder="Escríbalo una sola vez"></label>'
    +'<p class="note">Queda guardado en este teléfono.</p>'
    +'<h2 style="font-size:1.1em">Tamaño de letra</h2><div class="sizes"><button class="btn" data-act="fsm">A−&nbsp;Más chica</button><button class="btn" data-act="fsp">A+&nbsp;Más grande</button></div>'
    +'<button class="btn '+(S.voice?'primary':'')+'" data-act="voice">'+IC.spk+'Leer cada paso en voz alta: '+(S.voice?'SÍ':'NO')+'</button>'
@@ -469,7 +470,7 @@ var CAP={d:null,s:null,t:null};
 S.ans=null;S.ask=false;S.listening=false;S.auto=false;S.base='';
 S.vol=+ld('vol',0);S.volPick=false;S.vpend=null;S.verr='';S.rec=null;S.dpend=null;S.derr='';S.nag=false;S.skip=false;S.logConfirm=false;
 S.mt={id:'q',cb:null};S.convo=false;S.heard=false;S.convoAskedAt=0;
-S.volAsk=false;S.werr='';S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;
+S.volAsk=false;S.werr='';S.washKnown=ld('washknown','0')==='1';S.washAuto=false;S.washPaused=false;S.washAsk=false;S.washTimer=null;S.volInAsk=false;S.aspAsk=false;
 S.nick=ld('nick','');S.nm='';S.nerr='';
 /* arranca en el inicio con el micrófono grande; el nombre es opcional (menú) */
 try{S.log=JSON.parse(ld('log','[]'))||[]}catch(e){S.log=[]}
@@ -564,13 +565,18 @@ function jumpIntent(n){
 }
 function convoStart(){
   if(!CAP.d){S.convo=false;render();say('El modo manos libres necesita micrófono. Use los botones grandes: la guía lee cada paso sola y usted toca Siguiente.');return}
-  S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
+  S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;S.volAsk=false;S.aspAsk=false;S.volInAsk=false;S.washAsk=false;S.weighAsk=false;render();window.scrollTo(0,0);
   sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoBegin()});
 }
 function convoBegin(){
   if(!S.convo)return;
   var k=todayKey();
   if(!(S.weights[k]&&S.weights[k].antes!=null)){S.weighAsk='antes';sayThen('Antes de empezar. ¿Quiere anotar su peso de hoy? Diga el peso en kilos, por ejemplo setenta y dos. O diga no.',function(){if(S.convo)convoListen()});return}
+  convoAfterPre();
+}
+function convoAfterPre(){
+  if(!S.convo)return;
+  if(S.volDay!==todayKey()){S.volInAsk=true;sayThen('¿Cuántos litros va a infundir hoy? Es la cantidad que le indicó su médico o su enfermera. Por ejemplo, dos litros.',function(){if(S.convo)convoListen()});return}
   convoStep();
 }
 function convoFinishDone(){
@@ -612,7 +618,7 @@ function convoWashRead(){
 function convoListen(){if(!S.convo||!CAP.d)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
-  if(SAFE.test(n)){stopSay();S.volAsk=false;S.weighAsk=false;S.washAsk=false;sayThen(safeText(),function(){if(S.convo)convoListen()});return}
+  if(SAFE.test(n)){if(S.aspAsk&&S.rec){S.rec.asp=/turbio|opaco|lechoso|blanco|nublado|sucio|coagul|fibrin/.test(n)?'t':'s';recSave()}S.volAsk=false;S.weighAsk=false;S.washAsk=false;S.aspAsk=false;S.volInAsk=false;convoStop();S.view='phones';render();window.scrollTo(0,0);say(safeText());return}
   if(S.speaking){
     var ecoTxt=(S.sayingNorm||'');
     if((isStop(n)||isPause(n)||isBack(n)||isRepeat(n))&&(n&&ecoTxt.indexOf(n)<0)){stopSay()}
@@ -625,10 +631,16 @@ function convoHeard(text){
       var aprox=/\b(aproximad|mas o menos|masomenos|como|cerca de|alrededor|alredor|alre|ponele|creo|serian|seran|sera|debe ser|anda en|por ahi)\b/.test(n);
       S.weighAsk=false;saveWeight(wk,kg,aprox);render();
       var t='Anoté '+fmtKg(kg)+(aprox?', aproximado. No se olvide de pesarse en la balanza.':'.');
-      sayThen(t,function(){if(wk==='antes'){if(S.convo)convoStep()}else{convoFinishDone()}});return;
+      sayThen(t,function(){if(wk==='antes'){if(S.convo)convoAfterPre()}else{convoFinishDone()}});return;
     }
-    if(/\b(no|despues|mas tarde|salt|omit|no quiero|no gracias|no hoy|no se|no lo se|no me pese|sin pesar)\b/.test(n)){S.weighAsk=false;sayThen('Está bien'+nn()+'. No se olvide de pesarse en la balanza.',function(){if(wk==='antes'){if(S.convo)convoStep()}else{convoFinishDone()}});return}
+    if(/\b(no|despues|mas tarde|salt|omit|no quiero|no gracias|no hoy|no se|no lo se|no me pese|sin pesar)\b/.test(n)){S.weighAsk=false;sayThen('Está bien'+nn()+'. No se olvide de pesarse en la balanza.',function(){if(wk==='antes'){if(S.convo)convoAfterPre()}else{convoFinishDone()}});return}
     sayThen('No entendí el peso. Dígalo en kilos, por ejemplo setenta y dos. Si no está seguro, diga un número aproximado.',function(){if(S.convo)convoListen()});return;
+  }
+  if(S.volInAsk){
+    var vin=parseVol(text);
+    if(vin==null&&S.vol&&/\b(no se|no lo se|igual|lo mismo|como siempre|como la ultima|lo de siempre|los de siempre)\b/.test(n))vin=S.vol;
+    if(vin!=null){S.vol=vin;sv('vol',vin);S.volInAsk=false;S.volDay=todayKey();sv('volday',S.volDay);sayThen('Anoté '+fmtL(vin)+' para infundir hoy.',function(){if(S.convo)convoStep()});return}
+    sayThen('No entendí cuántos litros va a infundir. Dígalo, por ejemplo, dos litros, o un litro y medio.',function(){if(S.convo)convoListen()});return;
   }
   if(S.volAsk){
     if(isBack(n)){S.volAsk=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();return}
@@ -638,11 +650,21 @@ function convoHeard(text){
     if(ml!=null){
       S.volAsk=false;convoRecordDrain(ml);
       var t='Anoté '+fmtL(ml)+'.';
-      if(S.vol){t+=ml>=S.vol?' Sacó lo mismo o más de lo que infundió. Muy bien.':' Sacó menos de lo que infundió. Antes de infundir de nuevo, avise a su enfermera.';}
-      sayThen(t+' ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});
+      if(S.vol){t+=ml>=S.vol?' Sacó lo mismo o más de lo que infundió. Muy bien.':' Atención: sacó menos de lo que infundió. Anótelo y avise a su doctora.';}
+      S.aspAsk=true;
+      sayThen(t+' Ahora, ¿cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});
       return;
     }
     sayThen('No entendí la cantidad. ¿Cuánto líquido sacó? Por ejemplo, un litro y medio, o mil quinientos.',function(){if(S.convo)convoListen()});
+    return;
+  }
+  if(S.aspAsk){
+    var asp=/\b(sangre|sangr|rojo|rosado|rosa|colorad|coagul|fibrin)\b/.test(n)?'s':(/\b(turbio|opaco|lechoso|blanco|nublado|sucio)\b/.test(n)?'t':(/\b(transparent|limpio|claro|normal|cristalin|sin color)\b/.test(n)?'c':''));
+    if(!asp){sayThen('No entendí. ¿Cómo salió el líquido? Diga transparente, turbio, o con sangre.',function(){if(S.convo)convoListen()});return}
+    S.aspAsk=false;if(S.rec){S.rec.asp=asp;recSave()}
+    if(asp==='c'){sayThen('Transparente, muy bien. ¿Seguimos?',function(){S.convoAskedAt=Date.now();if(S.convo)convoListen()});return}
+    convoStop();S.view='phones';render();window.scrollTo(0,0);
+    say('El líquido salió '+(asp==='t'?'turbio':'con sangre')+'. Esto es importante. Llame urgente a su enfermera y a su doctora. Acá tiene los teléfonos para llamar.');
     return;
   }
   var jj=jumpIntent(n);
@@ -737,13 +759,14 @@ function vPhones(){
   var o='<header class="top"><div class="toprow"><span>Teléfonos</span></div></header><main style="padding-block:16px 40px"><div class="stack">'
    +'<button class="btn" data-act="'+(S.convo?'closephones':'home')+'">'+IC.prev+(S.convo?'Volver':'Volver al inicio')+'</button>';
   if(S.phone)o+='<p class="phase" style="margin:6px 0 0">Mi enfermera</p><a class="btn callbtn" href="'+telHref(S.phone)+'">'+IC.phone+'Llamar · '+esc(S.phone)+'</a>';
+  if(S.phoneDoc)o+='<p class="phase" style="margin:6px 0 0">Mi doctora</p><a class="btn callbtn" href="'+telHref(S.phoneDoc)+'">'+IC.phone+'Llamar · '+esc(S.phoneDoc)+'</a>';
   o+='<p class="phase" style="margin:10px 0 0">Fresenius Nefra</p>';
   FRESENIUS.forEach(function(f){o+='<a class="btn callbtn" href="'+telHref(f.t)+'">'+IC.phone+esc(f.n)+' · '+esc(f.t)+'</a>'});
   o+='<p class="note">Tóquelos para llamar. También puede decir «teléfonos» por voz.</p>'
    +'</div></main>';
   return o;
 }
-function phonesSay(){var t='Teléfonos. '+(S.phone?'Su enfermera, '+sayDigits(S.phone)+'. ':'');FRESENIUS.forEach(function(f){t+=f.n+', '+sayDigits(f.t)+'. '});return t}
+function phonesSay(){var t='Teléfonos. '+(S.phone?'Su enfermera, '+sayDigits(S.phone)+'. ':'')+(S.phoneDoc?'Su doctora, '+sayDigits(S.phoneDoc)+'. ':'');FRESENIUS.forEach(function(f){t+=f.n+', '+sayDigits(f.t)+'. '});return t}
 function openPhones(read){
   S.prevView=S.view;S.view='phones';S.help=false;S.ask=false;render();window.scrollTo(0,0);
   if(read&&S.convo)sayThen(phonesSay(),function(){if(S.convo)convoListen()});
@@ -799,9 +822,9 @@ function initCaps(){
   }catch(e){}
   ensureBrowserDict();
 }
-var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangre|pierde|perdio|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota/;
+var SAFE=/contamin|equivoc|me toque|toque|cayo|se cayo|sucio|dolor|fiebre|turbio|sangre|pierde|perdio|fuga|gotea|hinch|rojo|pus\b|nauseas|vomit|mareo|me siento mal|me duele|se rompio|roto|rota|coagul|fibrin|escalofri|no drena|no dren/;
 var STOPW='que cual como donde cuando para con por una uno los las del esta este eso esa estoy tengo hago debo puedo hay mas muy pero sobre algo cosa paso pasos'.split(' ');
-function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o enfermero. Llame a su centro de diálisis'+(S.phone?' al '+S.phone:'')+'.'}
+function safeText(){return (S.nick?S.nick+', deténgase':'Deténgase')+' y no siga. Esto lo tiene que resolver su enfermera o su doctora. Llame a su enfermera'+(S.phone?' al '+S.phone:'')+' o a su doctora'+(S.phoneDoc?' al '+S.phoneDoc:'')+'. Toque el botón verde para llamar.'}
 function localAnswer(q,n){
   var cur=S.view==='step'&&S.flow==='main'?S.i:(S.back||0);
   if(/\b(telefono|tel[eé]fono|llamar|numero|n[uú]mero)\b/.test(n)){
@@ -956,10 +979,10 @@ function recPanel(){
     var d=r.drained,ok=!S.vol||d>=S.vol;
     o+='<p class="bigv">Sacó '+fmtL(d)+'</p><p class="note" style="margin:0">'+d+' mL anotados</p>';
     if(S.vol)o+=ok?'<p class="okbox">Infundió '+fmtL(S.vol)+' y sacó '+fmtL(d)+(d===S.vol?': sacó lo mismo. Muy bien.':': sacó más. Muy bien.')+'</p>'
-                  :'<p class="warnbox">Sacó menos de lo que infundió: faltaron '+(S.vol-d)+' mL. Antes de infundir de nuevo, avise a su enfermera o enfermero'+(S.phone?' al '+esc(S.phone):'')+'.</p>';
+                  :'<p class="warnbox">Sacó menos de lo que infundió: faltaron '+(S.vol-d)+' mL. Anótelo y avise a su doctora'+(S.phoneDoc?' al '+esc(S.phoneDoc):'')+' antes de infundir de nuevo.</p>';
     o+='<button class="btn soft" data-act="dfix">Corregir la cantidad</button>';
     o+='<p class="num" style="margin:8px 0 0">Aspecto del líquido</p><div class="chips">'+['c','t','s'].map(function(k){return '<button class="btn" data-act="asp" data-a="'+k+'" style="'+(r.asp===k?'background:var(--accent);color:var(--accent-ink)':'')+'">'+ASP[k]+'</button>'}).join('')+'</div>';
-    if(r.asp==='t'||r.asp==='s')o+='<p class="warnbox">Líquido '+ASP[r.asp].toLowerCase()+': avise a su enfermera o enfermero antes de seguir'+(S.phone?' (teléfono '+esc(S.phone)+')':'')+'.</p>';
+    if(r.asp==='t'||r.asp==='s')o+='<p class="warnbox">Líquido '+ASP[r.asp].toLowerCase()+'. Es importante: llame URGENTE a su enfermera y a su doctora.</p><button class="btn danger" data-act="phones" style="min-height:60px">'+IC.phone+'Ver teléfonos para llamar</button>';
   }else if(S.dpend!=null){
     o+='<p class="bigv">'+fmtL(S.dpend)+'</p><p style="margin:0">¿Sacó esta cantidad?</p><button class="btn primary" data-act="dyes">Sí, anotar '+fmtL(S.dpend)+'</button><button class="btn" data-act="dno">No, corregir</button>';
   }else{
@@ -1064,6 +1087,7 @@ function render(){
   if(S.view==='step'&&!S.help){var t=document.getElementById('ttl');if(t)t.focus({preventScroll:true})}
   var ph=document.getElementById('phone');
   if(ph)ph.addEventListener('input',function(){S.phone=ph.value;sv('phone',ph.value)});
+  var phd=document.getElementById('phonedoc');if(phd)phd.addEventListener('input',function(){S.phoneDoc=phd.value;sv('phonedoc',phd.value)});
   if(S.view==='home'&&!S.ask&&!S.help&&!S._greeted){S._greeted=1;setTimeout(greet,500)}
 }
 function greet(){try{say((S.nick?S.nick+'. ':'Hola. ')+'Toque el botón grande del micrófono para empezar.')}catch(e){}}
@@ -1121,8 +1145,8 @@ app.addEventListener('click',function(e){
     case 'resume':go(S.saved,'main');break;
     case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
-    case 'convonext':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();clearTimeout(S.washTimer);S.heard=true;if(S.flow==='wash'){S.washPaused=false;convoWashNext()}else{convoNext()}break;
-    case 'convoback':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();clearTimeout(S.washTimer);S.heard=true;S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();break;
+    case 'convonext':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();S.volAsk=false;S.aspAsk=false;S.volInAsk=false;S.washAsk=false;S.weighAsk=false;clearTimeout(S.washTimer);S.heard=true;if(S.flow==='wash'){S.washPaused=false;convoWashNext()}else{convoNext()}break;
+    case 'convoback':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();S.volAsk=false;S.aspAsk=false;S.volInAsk=false;S.washAsk=false;S.weighAsk=false;clearTimeout(S.washTimer);S.heard=true;S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();break;
     case 'next':
       if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();
       if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i>=WASH.length-1){washEnd()}else{go(S.i+1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
