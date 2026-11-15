@@ -534,8 +534,8 @@ function hookDict(d){
 }
 /* ---------- modo conversacion (manos libres) ---------- */
 function sayThen(t,cb){
-  t=speakable(t);S.speaking=true;try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
-  var done=false;function fin(){if(done)return;done=true;S.speaking=false;try{cb&&cb()}catch(e){}}
+  t=speakable(t);S.speaking=true;S.sayingNorm=norm(t);try{speechSynthesis.cancel()}catch(e){}try{if(CAP.t)CAP.t.stop()}catch(e){}
+  var done=false;function fin(){if(done)return;done=true;S.speaking=false;S.sayingNorm='';try{cb&&cb()}catch(e){}}
   if(CAP.t){try{CAP.t.speak(t.slice(0,1900),{voice:'buttery',rate:1.06,language:'es'}).then(fin,function(){browserSayThen(t,fin)});return}catch(e){}}
   browserSayThen(t,fin);
 }
@@ -563,7 +563,7 @@ function jumpIntent(n){
   return -1;
 }
 function convoStart(){
-  if(!CAP.d){say('El modo manos libres necesita micrófono. Use los botones grandes.');return}
+  if(!CAP.d){S.convo=false;render();say('El modo manos libres necesita micrófono. Use los botones grandes: la guía lee cada paso sola y usted toca Siguiente.');return}
   S.convo=true;S.help=false;S.ask=false;S.convoAskedAt=0;render();window.scrollTo(0,0);
   sayThen((S.nick?S.nick+'. ':'')+'Modo manos libres. Le voy a leer cada paso. Cuando termine, diga sí para seguir.', function(){if(S.convo)convoBegin()});
 }
@@ -574,13 +574,14 @@ function convoBegin(){
   convoStep();
 }
 function convoFinishDone(){
+  if(S.rec){S.rec.done=true;recSave()}
   sayThen('Muy bien'+nn()+'. Gracias por hacerlo con cuidado.',null);S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}sv('i',0);S.saved=0;S.view='done';render();window.scrollTo(0,0);
 }
 function convoStop(){S.convo=false;try{CAP.d&&CAP.d.stop()}catch(e){}stopSay();render()}
 var isPause=function(n){return /\b(pausa|pausá|frena|frená|para|pará|detene|detené|un segundo|un momento|un minuto|esper)\b/.test(n)};
 var WASHGAP=9000;
 function convoStep(){
-  if(!S.convo)return;S.convoAskedAt=0;
+  if(!S.convo)return;S.convoAskedAt=0;convoListen();
   if(S.flow==='wash'){convoWashRead();return}
   if(S.flow==='main'&&S.i===1&&!S.washKnown){
     S.washAsk=true;
@@ -608,9 +609,15 @@ function convoWashRead(){
     convoWashNext();
   });
 }
-function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;setTimeout(function(){if(!S.convo||S.speaking||(CAP.d.isOn&&CAP.d.isOn()))return;try{CAP.d.start().catch(function(){})}catch(e){}},450)}
+function convoListen(){if(!S.convo||!CAP.d)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;try{CAP.d.start().catch(function(){})}catch(e){}}
 function convoHeard(text){
   if(!S.convo)return;S.heard=true;clearTimeout(S.washTimer);var n=norm(text);
+  if(SAFE.test(n)){stopSay();S.volAsk=false;S.weighAsk=false;S.washAsk=false;sayThen(safeText(),function(){if(S.convo)convoListen()});return}
+  if(S.speaking){
+    var ecoTxt=(S.sayingNorm||'');
+    if((isStop(n)||isPause(n)||isBack(n)||isRepeat(n))&&(n&&ecoTxt.indexOf(n)<0)){stopSay()}
+    else return;
+  }
   if(isStop(n)){sayThen('Listo, apago el modo manos libres.',null);convoStop();return}
   if(S.weighAsk){
     var wk=S.weighAsk,kg=parseKg(text);
@@ -1114,9 +1121,10 @@ app.addEventListener('click',function(e){
     case 'resume':go(S.saved,'main');break;
     case 'convostart':S.convo=true;if(S.view!=='step'){go(0,'main')}convoStart();break;
     case 'convostop':convoStop();break;
-    case 'convonext':clearTimeout(S.washTimer);S.heard=true;if(S.flow==='wash'){S.washPaused=false;convoWashNext()}else{convoNext()}break;
-    case 'convoback':clearTimeout(S.washTimer);S.heard=true;S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();break;
+    case 'convonext':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();clearTimeout(S.washTimer);S.heard=true;if(S.flow==='wash'){S.washPaused=false;convoWashNext()}else{convoNext()}break;
+    case 'convoback':if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();clearTimeout(S.washTimer);S.heard=true;S.washPaused=false;if(S.i>0){S.i--;render();convoStep()}else convoStep();break;
     case 'next':
+      if(Date.now()-(S._nav||0)<450)break;S._nav=Date.now();
       if(S.flow==='wash'){ clearTimeout(S.washTimer);if(S.i>=WASH.length-1){washEnd()}else{go(S.i+1,'wash');if(S.washAuto&&!S.convo)washPlay()} }
       else if(S.i===6&&!(S.rec&&S.rec.drained!=null)&&!S.skip){S.nag=true;render();say('Falta anotar cuánto líquido sacó.')}
       else if(S.i>=STEPS.length-1){stopCount();stopSay();sv('i',0);S.saved=0;if(S.rec){S.rec.done=true;recSave()}S.view='done';render();window.scrollTo(0,0)}
