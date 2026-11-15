@@ -522,10 +522,14 @@ function hookDict(d){
     if(r.state==='idle'&&S.auto){S.auto=false;var q=document.getElementById(S.mt.id);if(q&&q.value.trim()&&S.mt.cb)S.mt.cb(q.value)}
   });
   if(d.onError)d.onError(function(err){
-    if(err==='not-allowed'||err==='service-not-allowed'){
-      if(S.convo)convoStop();
-      var n=document.querySelector('.micnote');if(n){n.hidden=false;n.textContent='El teléfono no dio permiso para el micrófono. Permití el micrófono en el navegador, o usá los botones grandes.'}
-    }
+    if(err==='no-speech'||err==='aborted')return; /* transitorio: silencio; se reintenta solo */
+    if(S.convo)convoStop();
+    var msg=(err==='not-allowed'||err==='service-not-allowed')
+      ? 'Este aparato no dio permiso para el micrófono. No pasa nada: la guía lee en voz alta sola y usted avanza con los botones grandes. La cantidad la puede escribir.'
+      : 'El micrófono de este aparato no está disponible. No pasa nada: la guía lee en voz alta sola y usted avanza con los botones grandes. La cantidad la puede escribir.';
+    try{say(msg)}catch(e){}
+    var n=document.querySelector('.micnote');if(n){n.hidden=false;n.textContent=msg}
+    try{setMic()}catch(e){}
   });
 }
 /* ---------- modo conversacion (manos libres) ---------- */
@@ -762,12 +766,15 @@ function makeBrowserDict(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR)return null;
   var rec;try{rec=new SR()}catch(e){return null}
-  rec.lang='es-AR';rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
+  var LANGS=['es-AR','es-ES','es-US','es-419','es'],li=0;
+  rec.lang=LANGS[0];rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
   var pcb=null,fcb=null,scb=null,ecb=null,on=false;
   rec.onresult=function(e){var interim='',fin='';for(var i=e.resultIndex;i<e.results.length;i++){var r=e.results[i];if(r.isFinal)fin+=r[0].transcript;else interim+=r[0].transcript}if(interim&&pcb)pcb({text:interim});if(fin&&fcb)fcb({text:fin})};
   rec.onstart=function(){on=true;if(scb)scb({state:'listening'})};
   rec.onend=function(){on=false;if(scb)scb({state:'idle'})};
-  rec.onerror=function(e){on=false;if(ecb)ecb(e&&e.error||'error')};
+  rec.onerror=function(e){on=false;var err=e&&e.error||'error';
+    if(err==='language-not-supported'&&li<LANGS.length-1){li++;try{rec.lang=LANGS[li]}catch(_){}return;}
+    if(ecb)ecb(err);};
   return {onPartial:function(c){pcb=c},onFinal:function(c){fcb=c},onState:function(c){scb=c},onError:function(c){ecb=c},
     isOn:function(){return on},
     start:function(){if(on)return Promise.resolve();try{rec.start();return Promise.resolve()}catch(e){if(e&&e.name==='InvalidStateError'){on=true;return Promise.resolve()}return Promise.reject(e)}},
