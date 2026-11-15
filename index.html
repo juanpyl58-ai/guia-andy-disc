@@ -165,10 +165,7 @@ var STEPS=[
 var PHASES=[
  {n:'Preparar el lugar',a:1,b:2},{n:'Armar el sistema',a:3,b:4},
  {n:'Conectar y drenar',a:5,b:7},{n:'Lavar e infundir',a:8,b:11},{n:'Desconectar',a:12,b:12}];
-var WASH=[
- 'Sáquese los anillos y las pulseras. Abra la canilla y regule el agua. Mójese las manos. Ponga jabón líquido o shampoo y haga mucha espuma en las palmas.',
- 'Lave la palma con el dorso de cada mano y entre los dedos. Después palma con palma, entre los dedos. Lave los dedos en gancho de las dos manos, los pulgares y la yema de los dedos. Enjuague las manos con los dedos hacia arriba.',
- 'Tome dos toallitas. Con una seque una mano: palma, dorso, dedo por dedo y la muñeca. Cierre la canilla. Con la otra toallita seque la otra mano de la misma manera.'];
+var WASH=['Sáquese los anillos y las pulseras. Abra la canilla y regule el agua. Mójese las manos. Ponga jabón líquido o shampoo y haga mucha espuma en las palmas. Lave la palma con el dorso de cada mano y entre los dedos. Después palma con palma, entre los dedos. Lave los dedos en gancho de las dos manos, los pulgares y la yema de los dedos. Enjuague las manos con los dedos hacia arriba. Tome dos toallitas. Con una seque una mano: palma, dorso, dedo por dedo y la muñeca. Cierre la canilla. Con la otra toallita seque la otra mano de la misma manera.'];
 
 /* ---------- estado ---------- */
 function ld(k,d){try{var v=localStorage.getItem('andy.'+k);return v===null?d:v}catch(e){return d}}
@@ -599,15 +596,12 @@ function convoRecordDrain(ml){
 }
 /* lavado fluido en voz: lee solo la indicación y avanza solo tras una pausa; escucha "pausa" para frenar */
 function convoWashRead(){
-  if(!S.convo||S.flow!=='wash')return;S.convoAskedAt=0;
+  if(!S.convo||S.flow!=='wash')return;S.convoAskedAt=0;clearTimeout(S.washTimer);
+  /* FIX-NOV14 (Juan): un solo audio. Lee el lavado completo de corrido y recién al terminar sigue.
+     No prende el micrófono ni usa temporizador durante la lectura (eso trababa y dejaba en silencio). */
   sayThen((S.i===0?'Lavado de manos. ':'')+WASH[S.i],function(){
     if(!S.convo||S.flow!=='wash')return;
-    S.heard=false;
-    if(!S.washPaused){clearTimeout(S.washTimer);S.washTimer=setTimeout(function(){
-      if(!S.convo||S.flow!=='wash'||S.washPaused)return;
-      try{CAP.d&&CAP.d.stop()}catch(e){}convoWashNext();
-    },WASHGAP);}
-    convoListen();
+    convoWashNext();
   });
 }
 function convoListen(){if(!S.convo||!CAP.d)return;if(S.speaking)return;if(CAP.d.isOn&&CAP.d.isOn())return;S.heard=false;setTimeout(function(){if(!S.convo||S.speaking||(CAP.d.isOn&&CAP.d.isOn()))return;try{CAP.d.start().catch(function(){})}catch(e){}},450)}
