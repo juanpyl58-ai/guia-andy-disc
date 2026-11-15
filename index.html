@@ -150,7 +150,7 @@ input[type=text]{font:inherit;padding:16px;border:3px solid var(--line);border-r
 var D1={s:['f'],lab:'',say:'un punto'};
 var STEPS=[
  {t:'Preparación',d:'Antes de empezar, prepare todo. Lávese las manos con agua y jabón, como siempre. Cierre puertas y ventanas, así no entran corrientes de aire ni polvo. Saque el catéter con cuidado. Póngase el barbijo cubriendo la nariz y la boca. Limpie la mesa con alcohol al 70 %, incluidos los bordes. Mire la bolsa y ábrala, revisando lo que le enseñó su enfermera o enfermero. Y mire el taper, el envase, y ábralo.',k:'hig',tag:'Preparación'},
- {t:'Lavado de manos con técnica',d:'Ahora lávese las manos con la técnica completa, paso por paso.',k:'hig',tag:'Higiene',wash:1},
+ {t:'Lavado de manos con técnica',d:'Ahora lávese las manos con la técnica completa, paso por paso. Tómese su tiempo: puede llevarle uno o dos minutos.',k:'hig',tag:'Higiene',wash:1,wait:1},
  {t:'Armar el sistema',d:'Cuelgue la bolsa y haga la prueba de hermeticidad, como le enseñaron. Coloque el organizador en el soporte. Y coloque el tapón.'},
  {t:'Preparar la conexión',d:'Póngase alcohol gel y frótese las manos hasta que se seque. Despegue las guías. Coloque el catéter en el organizador. Y vuelva a ponerse alcohol gel en las manos.',k:'hig',tag:'Higiene'},
  {t:'Conexión',d:'Póngase alcohol gel en las manos y frótelas hasta que sequen. Desenrosque el tapón del centro del sistema: amarillo si la bolsa es amarilla, verde si la bolsa es verde. Desenrosque el tapón de su catéter. Y enrosque su catéter en el centro.',k:'key',tag:'Momento clave'},
@@ -160,7 +160,7 @@ var STEPS=[
  {t:'Infusión',d:'Gire el disco hasta el medio pintado, en el grupo de tres símbolos abajo a la derecha. Es la posición de mitad abierto. Deje que entre el líquido; tarda unos minutos. Cuando termine de entrar, dígame listo, o toque Siguiente.',k:'key',tag:'Momento clave',wait:1,disc:{k:'inf',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['o','h','f'],lab:'INFUSIÓN',say:'el medio pintado, mitad abierto, infusión',legend:1},hint:'La punta azul va al medio pintado (mitad abierto), abajo a la derecha.'},
  {t:'Girar el disco a los cuatro puntos',d:'Gire el disco hasta los cuatro puntos.',disc:{k:'four',cap:'Dibujo del disco con el tubo hacia abajo. Compare con el suyo.',s:['f','f','f','f'],lab:'',say:'cuatro puntos'},hint:'La punta azul señala los cuatro puntos, a la izquierda.'},
  {t:'Cerrar la pinza del extensor',d:'Cierre la pinza del extensor.'},
- {t:'Desconexión',d:'Póngase alcohol gel en las manos, igual que en la conexión. Desenrosque el tapón. Desconéctese del centro, con el testigo azul, el PIN. Y enrosque su catéter en el tapón nuevo.',k:'key',tag:'Momento clave'}
+ {t:'Desconexión',d:'Póngase alcohol gel en las manos y frótelas hasta que sequen. Este paso es muy importante, hágalo con cuidado. Primero, asegúrese de haber cerrado la pinza, el clamp. Después, desenrosque el capuchón de la izquierda. A continuación, desconecte del centro su catéter, con el testigo azul. Y enrósquelo en su capuchón nuevo.',k:'key',tag:'Momento clave'}
 ];
 var PHASES=[
  {n:'Preparar el lugar',a:1,b:2},{n:'Armar el sistema',a:3,b:4},
@@ -698,7 +698,7 @@ function convoMaybe(text){
   convoListen();
 }
 function convoWashNext(){
-  if(S.i>=WASH.length-1){S.washAuto=false;S.washPaused=false;go(S.back,'main');if(S.convo)sayThen('Listo'+nn()+'. ¿Seguimos?',function(){if(S.convo)convoListen()});return}
+  if(S.i>=WASH.length-1){S.washAuto=false;S.washPaused=false;go(S.back,'main');if(S.convo)sayThen('Tómese su tiempo para lavarse bien'+nn()+', un minuto o dos. Cuando termine, dígame listo.',function(){if(S.convo)convoListen()});return}
   S.i++;render();convoStep();
 }
 function convoNext(){
